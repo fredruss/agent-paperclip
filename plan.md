@@ -66,6 +66,8 @@ A cute desktop pet companion that shows Claude Code's real-time status in an alw
 - [ ] Publish to npm registry
 
 ### Nice-to-Have (Future)
+- "Waiting" state when Claude needs human intervention (permission prompts, questions)
+- Display token usage statistics
 - Click pet to open detailed activity log
 - Sound effects (optional, toggleable)
 - Multiple pet skins/themes
