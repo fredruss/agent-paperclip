@@ -8,7 +8,8 @@
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
     "preuninstall": "node scripts/preuninstall.js",
-    "build": "cd app && npm run build && rm -rf ../out && cp -r out .."
+    "build:scripts": "tsc -p tsconfig.scripts.json",
+    "build": "npm run build:scripts && cd app && npm run build && rm -rf ../out && cp -r out .."
   },
   "files": [
     "bin/",
@@ -34,5 +35,9 @@
   },
   "dependencies": {
     "electron": "^33.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.2"
   }
 }

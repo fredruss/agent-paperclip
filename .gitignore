@@ -5,6 +5,9 @@ node_modules/
 app/out/
 app/dist/
 
+# Compiled TypeScript intermediate (not needed at runtime)
+shared/
+
 # Logs
 *.log
 npm-debug.log*
