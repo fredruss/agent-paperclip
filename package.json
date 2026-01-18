@@ -9,7 +9,9 @@
     "postinstall": "node scripts/postinstall.js",
     "preuninstall": "node scripts/preuninstall.js",
     "build:scripts": "tsc -p tsconfig.scripts.json",
-    "build": "npm run build:scripts && cd app && npm run build && rm -rf ../out && cp -r out .."
+    "build": "npm run build:scripts && cd app && npm run build && rm -rf ../out && cp -r out ..",
+    "test": "cd app && npm test",
+    "test:run": "cd app && npm run test:run"
   },
   "files": [
     "bin/",

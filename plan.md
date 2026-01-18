@@ -54,10 +54,6 @@ A cute desktop pet companion that shows Claude Code's real-time status in an alw
 - [x] `README.md` with installation and usage instructions
 - [x] Marked `app/package.json` as private to prevent accidental publish
 
-### Known Limitations
-
-- **Pure text responses (no tools)** - When Claude generates a response without using any tools, the pet will show "thinking" but won't transition to "working"/"reading" states. It will still show "done" when Claude finishes.
-
 ### Remaining Work
 
 #### Polish & Packaging

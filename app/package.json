@@ -12,13 +12,16 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron .",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "chokidar": "^4.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@testing-library/react": "^16.3.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
@@ -26,10 +29,12 @@
     "electron-vite": "^2.3.0",
     "eslint": "^9.39.2",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "jsdom": "^27.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.53.0",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^4.0.17"
   }
 }

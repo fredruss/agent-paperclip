@@ -67,7 +67,7 @@ async function ensureStatusDir(): Promise<void> {
 /**
  * Parse transcript JSONL file and sum up token usage
  */
-async function parseTranscriptUsage(transcriptPath: string | undefined): Promise<TokenUsage | null> {
+export async function parseTranscriptUsage(transcriptPath: string | undefined): Promise<TokenUsage | null> {
   if (!transcriptPath || !existsSync(transcriptPath)) {
     return null
   }
@@ -136,7 +136,7 @@ async function writeStatus(
   await writeFile(STATUS_FILE, JSON.stringify(data, null, 2))
 }
 
-async function handleEvent(event: HookEvent): Promise<void> {
+export async function handleEvent(event: HookEvent): Promise<void> {
   const { hook_event_name, tool_name, tool_input, tool_response, user_prompt, transcript_path } =
     event
 
@@ -255,7 +255,12 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err: Error) => {
-  console.error('Hook error:', err)
-  process.exit(1)
-})
+const isMain = typeof require !== 'undefined' && require.main === module
+
+// Only run when invoked directly; avoid running on import in tests.
+if (isMain) {
+  main().catch((err: Error) => {
+    console.error('Hook error:', err)
+    process.exit(1)
+  })
+}
