@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, Menu } from 'electron'
 import { join } from 'path'
 import { watch } from 'chokidar'
 import { readFile, mkdir } from 'fs/promises'
@@ -7,8 +7,17 @@ import { homedir } from 'os'
 
 const STATUS_DIR = join(homedir(), '.claude-companion')
 const STATUS_FILE = join(STATUS_DIR, 'status.json')
+const SETTINGS_FILE = join(STATUS_DIR, 'settings.json')
 
 let mainWindow: BrowserWindow | null = null
+
+// Sticker pack definitions (id and name only - renderer has the actual assets)
+const STICKER_PACKS = [
+  { id: 'default', name: 'Default' },
+  { id: 'kawaii', name: 'Kawaii' }
+]
+
+let activePack = 'default'
 
 interface Status {
   status: 'idle' | 'working' | 'reading' | 'done' | 'error'
@@ -29,6 +38,47 @@ async function readStatus(): Promise<Status> {
   } catch {
     return { status: 'idle', action: 'Waiting for Claude Code...', timestamp: Date.now() }
   }
+}
+
+interface Settings {
+  activePack: string
+}
+
+async function loadSettings(): Promise<void> {
+  try {
+    const content = await readFile(SETTINGS_FILE, 'utf-8')
+    const settings: Settings = JSON.parse(content)
+    if (settings.activePack && STICKER_PACKS.some((p) => p.id === settings.activePack)) {
+      activePack = settings.activePack
+    }
+  } catch {
+    // Use defaults
+  }
+}
+
+async function saveSettings(): Promise<void> {
+  const { writeFile } = await import('fs/promises')
+  await writeFile(SETTINGS_FILE, JSON.stringify({ activePack }, null, 2))
+}
+
+function showPackContextMenu(): void {
+  if (!mainWindow) return
+
+  const template = STICKER_PACKS.map((pack) => ({
+    label: pack.name,
+    type: 'radio' as const,
+    checked: pack.id === activePack,
+    click: (): void => {
+      activePack = pack.id
+      saveSettings().catch((err) => {
+        console.error('Failed to save settings:', err)
+      })
+      mainWindow?.webContents.send('pack-changed', activePack)
+    }
+  }))
+
+  const menu = Menu.buildFromTemplate(template)
+  menu.popup({ window: mainWindow })
 }
 
 function createWindow(): void {
@@ -88,14 +138,23 @@ ipcMain.handle('get-status', async () => {
   return await readStatus()
 })
 
+ipcMain.handle('get-active-pack', () => {
+  return activePack
+})
+
 ipcMain.on('start-drag', () => {
   if (mainWindow) {
     mainWindow.setIgnoreMouseEvents(false)
   }
 })
 
+ipcMain.on('show-pack-menu', () => {
+  showPackContextMenu()
+})
+
 app.whenReady().then(async () => {
   await ensureStatusDir()
+  await loadSettings()
   createWindow()
   setupStatusWatcher()
 

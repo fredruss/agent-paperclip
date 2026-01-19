@@ -13,11 +13,15 @@ export interface Status {
 }
 
 export type StatusCallback = (status: Status) => void
+export type PackCallback = (packId: string) => void
 
 export interface ElectronAPI {
   getStatus: () => Promise<Status>
   onStatusUpdate: (callback: StatusCallback) => () => void
   startDrag: () => void
+  getActivePack: () => Promise<string>
+  showPackMenu: () => void
+  onPackChanged: (callback: PackCallback) => () => void
 }
 
 declare global {

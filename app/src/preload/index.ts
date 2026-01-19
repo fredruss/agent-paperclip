@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Status, StatusCallback } from '../shared/types'
+import type { Status, StatusCallback, PackCallback } from '../shared/types'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getStatus: (): Promise<Status> => ipcRenderer.invoke('get-status'),
@@ -14,5 +14,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   startDrag: (): void => {
     ipcRenderer.send('start-drag')
+  },
+  getActivePack: (): Promise<string> => ipcRenderer.invoke('get-active-pack'),
+  showPackMenu: (): void => {
+    ipcRenderer.send('show-pack-menu')
+  },
+  onPackChanged: (callback: PackCallback): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, packId: string): void => {
+      callback(packId)
+    }
+    ipcRenderer.on('pack-changed', handler)
+    return () => {
+      ipcRenderer.removeListener('pack-changed', handler)
+    }
   }
 })

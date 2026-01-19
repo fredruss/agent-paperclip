@@ -18,6 +18,13 @@
   filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.2));
 }
 
+.pet-image {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.2));
+}
+
 /* Idle - no animation, just sitting still */
 .pet-idle {
   /* No animation when idle */
