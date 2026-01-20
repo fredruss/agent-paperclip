@@ -36,7 +36,7 @@ jobs:
 
       - name: Build for ${{ matrix.platform }}
         working-directory: app
-        run: npm run dist:${{ matrix.platform }}
+        run: npm run build && npx electron-builder --${{ matrix.platform }} --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
