@@ -1,5 +1,6 @@
 appId: com.claude-companion.app
 productName: Claude Code Companion
+publish: never
 directories:
   output: dist
   buildResources: resources
