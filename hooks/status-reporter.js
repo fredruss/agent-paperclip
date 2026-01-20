@@ -88,9 +88,10 @@ async function parseTranscriptUsage(transcriptPath) {
                     latestRequestId = entry.requestId || null;
                     // Context size = input + cache_creation + cache_read
                     // This represents how "full" the context window is for this request
-                    latestContext = (usage.input_tokens || 0)
-                        + (usage.cache_creation_input_tokens || 0)
-                        + (usage.cache_read_input_tokens || 0);
+                    latestContext =
+                        (usage.input_tokens || 0) +
+                            (usage.cache_creation_input_tokens || 0) +
+                            (usage.cache_read_input_tokens || 0);
                     latestOutput = usage.output_tokens || 0;
                 }
             }

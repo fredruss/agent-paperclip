@@ -14,13 +14,18 @@
     "start": "electron .",
     "lint": "eslint src",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "chokidar": "^4.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "electron-builder": "^25.1.8",
     "@testing-library/react": "^16.3.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

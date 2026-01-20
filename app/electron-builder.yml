@@ -1,0 +1,33 @@
+appId: com.claude-companion.app
+productName: Claude Companion
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**/*
+  - "!node_modules"
+extraResources:
+  - from: ../hooks
+    to: hooks
+mac:
+  target: dmg
+  icon: resources/icon.icns
+  category: public.app-category.utilities
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+win:
+  target: nsis
+  icon: resources/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  target: AppImage
+  icon: resources/icon.png
+  category: Utility
