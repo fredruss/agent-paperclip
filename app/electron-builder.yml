@@ -1,5 +1,5 @@
 appId: com.claude-companion.app
-productName: Claude Companion
+productName: Claude Code Companion
 directories:
   output: dist
   buildResources: resources

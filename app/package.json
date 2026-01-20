@@ -1,5 +1,5 @@
 {
-  "name": "claude-companion-dev",
+  "name": "claude-code-companion-dev",
   "version": "1.0.0",
   "type": "module",
   "private": true,

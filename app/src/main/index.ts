@@ -104,11 +104,11 @@ async function isHookConfigured(): Promise<boolean> {
 async function setupHooks(): Promise<void> {
   // Check if hooks are already configured
   if (await isHookConfigured()) {
-    console.log('Claude Companion hooks already configured')
+    console.log('Claude Code Companion hooks already configured')
     return
   }
 
-  console.log('Setting up Claude Companion hooks...')
+  console.log('Setting up Claude Code Companion hooks...')
 
   // Ensure directories exist
   if (!existsSync(COMPANION_HOOKS_DIR)) {
@@ -267,13 +267,14 @@ ipcMain.on('show-pack-menu', () => {
 })
 
 app.whenReady().then(async () => {
+  app.setName('Claude Code Companion')
   await ensureStatusDir()
   try {
     await setupHooks()
   } catch (err) {
     const { dialog } = await import('electron')
     dialog.showErrorBox(
-      'Claude Companion Setup Failed',
+      'Claude Code Companion Setup Failed',
       `Could not configure hooks:\n\n${err instanceof Error ? err.message : String(err)}\n\nCheck that your home directory is writable.`
     )
     app.quit()

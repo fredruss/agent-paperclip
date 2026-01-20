@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Claude Companion Pre-uninstall Script
+ * Claude Code Companion Pre-uninstall Script
  *
  * Removes Claude Code hooks configuration.
  * - Removes hook entries from ~/.claude/settings.json
@@ -92,20 +92,20 @@ function removeHooksFromSettings(): void {
 
   if (modified) {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2))
-    console.log(`Removed Claude Companion hooks from ${SETTINGS_FILE}`)
+    console.log(`Removed Claude Code Companion hooks from ${SETTINGS_FILE}`)
   } else {
-    console.log('No Claude Companion hooks found in settings')
+    console.log('No Claude Code Companion hooks found in settings')
   }
 }
 
 function main(): void {
-  console.log('\nRemoving Claude Companion hooks...\n')
+  console.log('\nRemoving Claude Code Companion hooks...\n')
 
   try {
     removeHooksFromSettings()
     removeHookScript()
 
-    console.log('\nClaude Companion hooks removed.')
+    console.log('\nClaude Code Companion hooks removed.')
     console.log('Note: ~/.claude-companion/status.json was preserved.\n')
   } catch (err) {
     console.error('Error during uninstall:', (err as Error).message)

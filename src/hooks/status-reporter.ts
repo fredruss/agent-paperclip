@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Claude Companion Status Reporter Hook
+ * Claude Code Companion Status Reporter Hook
  *
  * This script receives events from Claude Code hooks and writes
  * status updates to ~/.claude-companion/status.json

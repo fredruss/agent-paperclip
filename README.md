@@ -1,4 +1,4 @@
-# Claude Companion
+# Claude Code Companion
 
 A desktop pet that shows Claude Code's real-time status. Watch your little companion read, write, and work alongside you!
 
@@ -8,24 +8,24 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 | Platform | Download |
 |----------|----------|
-| macOS (Apple Silicon) | `Claude Companion-x.x.x-arm64.dmg` |
-| macOS (Intel) | `Claude Companion-x.x.x.dmg` |
-| Windows | `Claude Companion-x.x.x.exe` |
-| Linux | `Claude Companion-x.x.x.AppImage` |
+| macOS (Apple Silicon) | `Claude Code Companion-x.x.x-arm64.dmg` |
+| macOS (Intel) | `Claude Code Companion-x.x.x.dmg` |
+| Windows | `Claude Code Companion-x.x.x.exe` |
+| Linux | `Claude Code Companion-x.x.x.AppImage` |
 
 ### Setup
 
-**macOS**: Open the `.dmg` and drag Claude Companion to Applications. On first launch, right-click and select "Open" to bypass Gatekeeper.
+**macOS**: Open the `.dmg` and drag Claude Code Companion to Applications. On first launch, right-click and select "Open" to bypass Gatekeeper.
 
 **Windows**: Run the `.exe` installer and follow the prompts.
 
 **Linux**: Make the `.AppImage` executable (`chmod +x`) and run it.
 
-On first launch, Claude Companion automatically configures the Claude Code hooks needed to receive status updates.
+On first launch, Claude Code Companion automatically configures the Claude Code hooks needed to receive status updates.
 
 ## Usage
 
-Launch Claude Companion from your Applications folder (macOS), Start menu (Windows), or run the AppImage (Linux).
+Launch Claude Code Companion from your Applications folder (macOS), Start menu (Windows), or run the AppImage (Linux).
 
 The pet window will appear and float on top of other windows. It automatically updates based on what Claude Code is doing:
 
@@ -43,7 +43,7 @@ The pet window will appear and float on top of other windows. It automatically u
 
 ## How It Works
 
-Claude Companion uses Claude Code's hook system to receive real-time events:
+Claude Code Companion uses Claude Code's hook system to receive real-time events:
 
 ```
 Claude Code (Terminal) --[hooks]--> status.json <--[watching]-- Desktop Pet (Electron)
@@ -68,7 +68,7 @@ Check that the hooks are configured in `~/.claude/settings.json`:
 cat ~/.claude/settings.json | grep claude-companion
 ```
 
-If hooks are missing, try relaunching Claude Companion - it configures hooks automatically on startup.
+If hooks are missing, try relaunching Claude Code Companion - it configures hooks automatically on startup.
 
 ### Pet window doesn't appear
 

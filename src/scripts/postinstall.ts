@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Claude Companion Post-install Script
+ * Claude Code Companion Post-install Script
  *
  * Configures Claude Code hooks to send status updates to the desktop pet.
  * - Copies the status reporter hook to ~/.claude-companion/hooks/
@@ -126,13 +126,13 @@ function updateSettings(): void {
 }
 
 function main(): void {
-  console.log('\nConfiguring Claude Companion hooks...\n')
+  console.log('\nConfiguring Claude Code Companion hooks...\n')
 
   try {
     copyHookScript()
     updateSettings()
 
-    console.log('\nClaude Companion installed successfully!')
+    console.log('\nClaude Code Companion installed successfully!')
     console.log('\nRun "claude-companion" to launch the desktop pet.')
     console.log("The pet will show Claude Code's status when you use it in a terminal.\n")
   } catch (err) {

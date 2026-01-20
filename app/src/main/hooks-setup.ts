@@ -44,11 +44,11 @@ export interface SetupHooksOptions {
 export async function setupHooks(options: SetupHooksOptions): Promise<void> {
   // Check if hooks are already configured
   if (await isHookConfigured()) {
-    console.log('Claude Companion hooks already configured')
+    console.log('Claude Code Companion hooks already configured')
     return
   }
 
-  console.log('Setting up Claude Companion hooks...')
+  console.log('Setting up Claude Code Companion hooks...')
 
   // Ensure directories exist
   if (!existsSync(COMPANION_HOOKS_DIR)) {

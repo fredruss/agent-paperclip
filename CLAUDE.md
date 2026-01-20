@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Claude Companion is a desktop pet application that displays Claude Code's real-time status in a floating window. It uses Claude Code hooks to capture tool usage events and displays them via an animated mascot.
+Claude Code Companion is a desktop pet application that displays Claude Code's real-time status in a floating window. It uses Claude Code hooks to capture tool usage events and displays them via an animated mascot.
 
 ## Commands
 
