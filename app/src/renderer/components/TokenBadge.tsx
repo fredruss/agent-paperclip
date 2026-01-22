@@ -13,7 +13,7 @@ const HIDE_DELAY = 10000 // Hide badge after 10 seconds of idle
 /**
  * Format token count in compact form: 1234 → "1.2k", 1234567 → "1.2M"
  */
-function formatTokens(count: number): string {
+export function formatTokens(count: number): string {
   if (count >= 1_000_000) {
     return `${(count / 1_000_000).toFixed(1)}M`
   }
