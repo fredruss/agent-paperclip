@@ -15,19 +15,18 @@ A desktop companion pet that shows Claude Code's real-time status and token usag
 
 ### Setup
 
-1. Clone the repository:
+1. Clone and install:
    ```bash
    git clone https://github.com/fredsourcing/claude-companion
-   cd claude-companion/app
+   cd claude-companion
    npm install
    ```
+   This installs dependencies and prompts to configure Claude Code hooks. Type `y` to allow.
 
 2. Run the app:
    ```bash
    npm run dev
    ```
-
-On first launch, the app adds hooks to `~/.claude/settings.json` to receive Claude Code events.
 
 ## Usage
 
@@ -60,17 +59,23 @@ Claude Code (Terminal) --[hooks]--> status.json <--[watching]-- Desktop Pet (Ele
 
 ## Privacy
 
-The companion displays:
-- **Current status** - What Claude is doing (reading, writing, thinking)
-- **Thinking snippets** - Brief excerpts of Claude's internal reasoning (truncated to ~40 characters)
+The companion displays status information in `~/.claude-companion/status.json`.
+
+**What IS captured in status.json:**
+- **Tool names** - Read, Write, Bash, Grep, etc.
+- **Filenames** - Names of files being read, written, or edited (e.g., `Reading index.ts...`)
+- **Command names** - First word of bash commands (e.g., `Running npm...`)
+- **Search patterns** - Grep patterns, truncated to 20 characters (e.g., `Searching for "pattern"...`)
+- **Thinking snippets** - Brief excerpts of Claude's internal reasoning, truncated to ~40 characters
 - **Token counts** - Current context window usage
 
 **What is NOT captured:**
 - Claude's responses to you (only internal "thinking" blocks are read)
 - Your prompts or questions
 - File contents or code
+- Full bash commands (only the first word)
 
-All data stays local on your machine in `~/.claude-companion/status.json` and is never sent anywhere.
+All data stays local on your machine and is never sent anywhere.
 
 ### Transcript Data
 
@@ -102,7 +107,7 @@ Check that the hooks are configured in `~/.claude/settings.json`:
 cat ~/.claude/settings.json | grep claude-companion
 ```
 
-If hooks are missing, restart the app - it configures hooks automatically on launch.
+If hooks are missing, run `node bin/claude-companion.js setup` from the project root to configure them.
 
 ### Pet window doesn't appear
 

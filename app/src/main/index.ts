@@ -4,7 +4,6 @@ import { watch } from 'chokidar'
 import { readFile, mkdir, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
-import { setupHooks } from './hooks-setup'
 
 const STATUS_DIR = join(homedir(), '.claude-companion')
 const STATUS_FILE = join(STATUS_DIR, 'status.json')
@@ -59,15 +58,6 @@ async function loadSettings(): Promise<void> {
 
 async function saveSettings(): Promise<void> {
   await writeFile(SETTINGS_FILE, JSON.stringify({ activePack }, null, 2))
-}
-
-function getHookSourcePath(): string {
-  // In packaged app, hooks are in resources/hooks/
-  // In development, they're in ../hooks/ relative to app folder
-  if (app.isPackaged) {
-    return join(process.resourcesPath, 'hooks', 'status-reporter.js')
-  }
-  return join(__dirname, '../../../hooks/status-reporter.js')
 }
 
 function showPackContextMenu(): void {
@@ -164,17 +154,6 @@ ipcMain.on('show-pack-menu', () => {
 app.whenReady().then(async () => {
   app.setName('Claude Code Companion')
   await ensureStatusDir()
-  try {
-    await setupHooks({ getHookSourcePath })
-  } catch (err) {
-    const { dialog } = await import('electron')
-    dialog.showErrorBox(
-      'Claude Code Companion Setup Failed',
-      `Could not configure hooks:\n\n${err instanceof Error ? err.message : String(err)}\n\nCheck that your home directory is writable.`
-    )
-    app.quit()
-    return
-  }
   await loadSettings()
   createWindow()
   setupStatusWatcher()

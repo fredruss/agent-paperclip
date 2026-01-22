@@ -15,10 +15,12 @@
     "src/hooks/**/*.ts",
     "src/bin/**/*.ts",
     "src/scripts/**/*.ts",
-    "src/shared/**/*.ts"
+    "src/shared/**/*.ts",
+    "src/lib/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "app"
+    "app",
+    "**/*.test.ts"
   ]
 }

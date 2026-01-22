@@ -8,15 +8,19 @@
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
     "preuninstall": "node scripts/preuninstall.js",
+    "dev": "cd app && npm run dev",
     "build:scripts": "tsc -p tsconfig.scripts.json",
     "build": "npm run build:scripts && cd app && npm run build && rm -rf ../out && cp -r out ..",
-    "test": "cd app && npm test",
-    "test:run": "cd app && npm run test:run"
+    "test": "npm run test:scripts && cd app && npm test",
+    "test:run": "npm run test:scripts:run && cd app && npm run test:run",
+    "test:scripts": "vitest --config vitest.config.ts",
+    "test:scripts:run": "vitest run --config vitest.config.ts"
   },
   "files": [
     "bin/",
     "scripts/",
     "hooks/",
+    "lib/",
     "out/"
   ],
   "keywords": [
@@ -40,6 +44,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.0.17"
   }
 }
