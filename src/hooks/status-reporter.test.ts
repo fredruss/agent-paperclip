@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { HookEvent } from '../../../src/shared/types'
+import type { HookEvent } from '../shared/types'
 
 // Mock fs and fs/promises before any imports that might use them
 const mockExistsSync = vi.fn()
@@ -25,7 +25,7 @@ vi.mock('fs/promises', () => ({
 }))
 
 // Now import the module under test
-const { handleEvent, parseTranscript } = await import('../../../src/hooks/status-reporter')
+const { handleEvent, parseTranscript } = await import('./status-reporter')
 
 describe('handleEvent', () => {
   beforeEach(() => {
