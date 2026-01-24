@@ -2,7 +2,7 @@
 
 <img src="app/resources/icon.png" width="128" alt="Claude Code Companion icon">
 
-A desktop companion that lets you monitor Claude Code at a glance. See when it's done, when it needs input, and how much context you've used without having to stare at to your terminal. Also, it's cute.
+A desktop companion that lets you monitor Claude Code. See when it's done, when it needs input, and how much context you've used without having to stare at your terminal. Also, it's cute.
 
 <img src="app/resources/companion_screenshot.png" width="200" alt="Screenshot of Claude Code Companion showing the pet with a speech bubble and token count">
 
@@ -13,7 +13,19 @@ A desktop companion that lets you monitor Claude Code at a glance. See when it's
 - Node.js 18+
 - Claude Code CLI
 
-### Setup
+### Option 1: npm (recommended)
+
+```bash
+npm install -g claude-code-companion
+```
+
+This installs the app and prompts to configure Claude Code hooks. Then run:
+
+```bash
+claude-companion
+```
+
+### Option 2: From source
 
 1. Clone and install:
    ```bash

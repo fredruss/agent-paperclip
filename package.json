@@ -8,6 +8,7 @@
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
     "preuninstall": "node scripts/preuninstall.js",
+    "prepublishOnly": "npm run build && cd app && npm run lint && cd .. && npm run test:run",
     "dev": "cd app && npm run dev",
     "build:scripts": "tsc -p tsconfig.scripts.json",
     "build": "npm run build:scripts && cd app && npm run build && rm -rf ../out && cp -r out ..",

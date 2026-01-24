@@ -3,12 +3,9 @@
 /**
  * Claude Code Companion Post-install Script
  *
- * Installs app dependencies and prompts user to configure Claude Code hooks.
+ * Prompts user to configure Claude Code hooks.
  */
 
-import { execSync } from 'child_process'
-import path from 'path'
-import fs from 'fs'
 import {
   SETTINGS_FILE,
   runSetupSync,
@@ -16,18 +13,6 @@ import {
 } from '../lib/setup'
 
 async function main(): Promise<void> {
-  // Install app dependencies if app folder exists
-  const appDir = path.join(__dirname, '..', 'app')
-  if (fs.existsSync(path.join(appDir, 'package.json'))) {
-    console.log('\nInstalling app dependencies...')
-    try {
-      execSync('npm install', { cwd: appDir, stdio: 'inherit' })
-    } catch {
-      console.error('Failed to install app dependencies')
-      process.exit(1)
-    }
-  }
-
   console.log('\nClaude Code Companion installed!\n')
   console.log('To show Claude Code status, hooks need to be added to:')
   console.log(`  ${SETTINGS_FILE}\n`)
@@ -60,7 +45,7 @@ async function main(): Promise<void> {
     console.log(`Backed up existing settings to ${result.backupPath}`)
   }
   console.log(`Updated settings at ${result.settingsPath}`)
-  console.log('\nSetup complete! Run "npm run dev" to launch.\n')
+  console.log('\nSetup complete! Run "claude-companion" to launch.\n')
 }
 
 main()

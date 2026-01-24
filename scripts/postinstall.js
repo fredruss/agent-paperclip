@@ -3,29 +3,11 @@
 /**
  * Claude Code Companion Post-install Script
  *
- * Installs app dependencies and prompts user to configure Claude Code hooks.
+ * Prompts user to configure Claude Code hooks.
  */
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const child_process_1 = require("child_process");
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
 const setup_1 = require("../lib/setup");
 async function main() {
-    // Install app dependencies if app folder exists
-    const appDir = path_1.default.join(__dirname, '..', 'app');
-    if (fs_1.default.existsSync(path_1.default.join(appDir, 'package.json'))) {
-        console.log('\nInstalling app dependencies...');
-        try {
-            (0, child_process_1.execSync)('npm install', { cwd: appDir, stdio: 'inherit' });
-        }
-        catch {
-            console.error('Failed to install app dependencies');
-            process.exit(1);
-        }
-    }
     console.log('\nClaude Code Companion installed!\n');
     console.log('To show Claude Code status, hooks need to be added to:');
     console.log(`  ${setup_1.SETTINGS_FILE}\n`);
@@ -51,6 +33,6 @@ async function main() {
         console.log(`Backed up existing settings to ${result.backupPath}`);
     }
     console.log(`Updated settings at ${result.settingsPath}`);
-    console.log('\nSetup complete! Run "npm run dev" to launch.\n');
+    console.log('\nSetup complete! Run "claude-companion" to launch.\n');
 }
 main();
