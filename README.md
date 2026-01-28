@@ -19,7 +19,7 @@ A desktop companion that lets you monitor Claude Code. See when it's done, when 
 npm install -g @fredruss/claude-code-companion
 ```
 
-This installs the app and prompts to configure Claude Code hooks. If the prompt was skipped (e.g., piped install), run:
+After installing, configure the Claude Code hooks:
 
 ```bash
 claude-companion setup
