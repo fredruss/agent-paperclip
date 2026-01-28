@@ -5,6 +5,7 @@
  *
  * Commands:
  *   claude-companion       - Launch the desktop pet app
+ *   claude-companion stop  - Stop the running app
  *   claude-companion setup - Configure Claude Code hooks (with confirmation)
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
@@ -55,19 +56,35 @@ function launchApp() {
     child.unref();
     console.log('Claude Code Companion launched!');
 }
+function stopApp() {
+    try {
+        // Kill Electron processes running claude-companion
+        // Match the app path argument: .../claude-code-companion/out/main/index.js
+        (0, child_process_1.execSync)('pkill -f "claude-code-companion/out/main"', { stdio: 'ignore' });
+        console.log('Claude Code Companion stopped.');
+    }
+    catch {
+        // pkill returns non-zero if no processes matched
+        console.log('Claude Code Companion is not running.');
+    }
+}
 const command = process.argv[2];
 async function main() {
     if (command === 'setup') {
         await runSetup();
     }
+    else if (command === 'stop') {
+        stopApp();
+    }
     else if (command === undefined) {
         launchApp();
     }
     else {
-        console.log('Usage: claude-companion [setup]');
+        console.log('Usage: claude-companion [command]');
         console.log('');
         console.log('Commands:');
         console.log('  (none)  Launch the desktop pet');
+        console.log('  stop    Stop the running app');
         console.log('  setup   Configure Claude Code hooks');
         process.exit(1);
     }

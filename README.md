@@ -57,7 +57,7 @@ The pet also displays the context window usage (input + cache tokens from the la
 
 - **Drag** - Click and drag the pet to move it around your screen
 - **Right-click** - Change sticker pack (2 packs currently available + basic SVG pack)
-- **Close** - Quit from the dock/taskbar or Activity Monitor/Task Manager
+- **Stop** - Run `claude-companion stop`, use Cmd+Q, or quit from the dock
 
 ## How It Works
 
