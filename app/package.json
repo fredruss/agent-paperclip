@@ -6,7 +6,7 @@
   "description": "Desktop pet companion for Claude Code (development)",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fredsourcing/claude-companion.git"
+    "url": "https://github.com/fredruss/claude-companion.git"
   },
   "main": "./out/main/index.js",
   "author": "",

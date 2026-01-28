@@ -29,7 +29,7 @@ claude-companion
 
 1. Clone and install:
    ```bash
-   git clone https://github.com/fredsourcing/claude-companion
+   git clone https://github.com/fredruss/claude-companion
    cd claude-companion
    npm install
    ```

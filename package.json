@@ -35,7 +35,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fredsourcing/claude-companion"
+    "url": "https://github.com/fredruss/claude-companion"
   },
   "engines": {
     "node": ">=18"
