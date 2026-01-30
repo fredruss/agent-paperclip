@@ -81,30 +81,32 @@ function stopApp(): void {
 function stopAppWindows(): void {
   try {
     // Pattern matches both local dev (claude-companion) and npm-installed (claude-code-companion)
-    const pattern = '%companion%out%main%index.js%'
+    const pattern = '*companion*out*main*index.js*'
 
-    // Check if any matching processes exist using WMIC
-    const checkResult = execSync(
-      `wmic process where "CommandLine like '${pattern}'" get ProcessId 2>nul`,
-      { encoding: 'utf-8' }
-    )
+    // Use PowerShell to find electron processes (replacement for deprecated wmic)
+    const findScript =
+      `Get-CimInstance Win32_Process | ` +
+      `Where-Object { $_.Name -eq 'electron.exe' -and $_.CommandLine -like '${pattern}' } | ` +
+      `Select-Object -ExpandProperty ProcessId`
 
-    // WMIC returns just header "ProcessId" with whitespace if no matches
-    const hasProcess =
-      checkResult
-        .split('\n')
-        .filter((line) => line.trim() && !/ProcessId/i.test(line)).length > 0
+    const output = execSync(`powershell -NoProfile -Command "${findScript}"`, {
+      encoding: 'utf-8'
+    }).trim()
 
-    if (!hasProcess) {
+    if (!output) {
       console.log('Claude Code Companion is not running.')
       return
     }
 
-    // Kill the processes
-    execSync(
-      `wmic process where "CommandLine like '${pattern}'" delete`,
-      { stdio: 'ignore' }
-    )
+    // Kill each process with taskkill
+    const pids = output.split(/\r?\n/).filter((p) => p.trim())
+    for (const pid of pids) {
+      try {
+        execSync(`taskkill /F /PID ${pid.trim()}`, { stdio: 'ignore' })
+      } catch {
+        // Ignore errors - child processes may already be terminated
+      }
+    }
     console.log('Claude Code Companion stopped.')
   } catch {
     console.log('Claude Code Companion is not running.')
