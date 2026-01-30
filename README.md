@@ -4,7 +4,7 @@
 
 A desktop companion that lets you monitor Claude Code. See when it's done, when it needs input, and how much context you've used without having to stare at your terminal. Also, it's cute.
 
-<img src="app/resources/companion_screenshot.png" width="200" alt="Screenshot of Claude Code Companion showing the pet with a speech bubble and token count">
+<img src="app/resources/ccc-gif.gif" width="200" alt="Screenshot of Claude Code Companion showing the pet with a speech bubble and token count">
 
 ## Installation
 
@@ -58,6 +58,8 @@ The pet window will appear and float on top of other windows. It automatically u
 - **Error** - Something went wrong
 
 The pet also displays the context window usage (input + cache tokens from the latest API call).
+
+<img src="app/resources/ccc-all-stickers.png" width="800" alt="Screenshot of all Claude Code Companion stickers">
 
 ### Controls
 
