@@ -156,7 +156,7 @@ async function writeStatus(status, action, usage = null) {
     await (0, promises_1.writeFile)(STATUS_FILE, JSON.stringify(data, null, 2));
 }
 async function handleEvent(event) {
-    const { hook_event_name, tool_name, tool_input, tool_response, user_prompt, transcript_path } = event;
+    const { hook_event_name, tool_name, tool_input, tool_response, transcript_path } = event;
     // Parse token usage and thinking content from transcript
     const { usage, thinking } = await parseTranscript(transcript_path);
     switch (hook_event_name) {
