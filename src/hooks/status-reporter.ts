@@ -195,8 +195,7 @@ async function writeStatus(
 }
 
 export async function handleEvent(event: HookEvent): Promise<void> {
-  const { hook_event_name, tool_name, tool_input, tool_response, user_prompt, transcript_path } =
-    event
+  const { hook_event_name, tool_name, tool_input, tool_response, transcript_path } = event
 
   // Parse token usage and thinking content from transcript
   const { usage, thinking } = await parseTranscript(transcript_path)

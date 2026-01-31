@@ -57,6 +57,45 @@ function launchApp() {
     console.log('Claude Code Companion launched!');
 }
 function stopApp() {
+    if (process.platform === 'win32') {
+        stopAppWindows();
+    }
+    else {
+        stopAppUnix();
+    }
+}
+function stopAppWindows() {
+    try {
+        // Pattern matches both local dev (claude-companion) and npm-installed (claude-code-companion)
+        const pattern = '*companion*out*main*index.js*';
+        // Use PowerShell to find electron processes (replacement for deprecated wmic)
+        const findScript = `Get-CimInstance Win32_Process | ` +
+            `Where-Object { $_.Name -eq 'electron.exe' -and $_.CommandLine -like '${pattern}' } | ` +
+            `Select-Object -ExpandProperty ProcessId`;
+        const output = (0, child_process_1.execSync)(`powershell -NoProfile -Command "${findScript}"`, {
+            encoding: 'utf-8'
+        }).trim();
+        if (!output) {
+            console.log('Claude Code Companion is not running.');
+            return;
+        }
+        // Kill each process with taskkill
+        const pids = output.split(/\r?\n/).filter((p) => p.trim());
+        for (const pid of pids) {
+            try {
+                (0, child_process_1.execSync)(`taskkill /F /PID ${pid.trim()}`, { stdio: 'ignore' });
+            }
+            catch {
+                // Ignore errors - child processes may already be terminated
+            }
+        }
+        console.log('Claude Code Companion stopped.');
+    }
+    catch {
+        console.log('Claude Code Companion is not running.');
+    }
+}
+function stopAppUnix() {
     try {
         // Kill Electron processes running claude-companion
         // Match the app path argument: .../claude-code-companion/out/main/index.js

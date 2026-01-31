@@ -4,6 +4,7 @@ import { watch } from 'chokidar'
 import { readFile, mkdir, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
+import type { Status } from '../shared/types'
 
 const STATUS_DIR = join(homedir(), '.claude-companion')
 const STATUS_FILE = join(STATUS_DIR, 'status.json')
@@ -19,12 +20,6 @@ const STICKER_PACKS = [
 ]
 
 let activePack = 'bot1'
-
-interface Status {
-  status: 'idle' | 'working' | 'reading' | 'done' | 'error'
-  action: string
-  timestamp: number
-}
 
 async function ensureStatusDir(): Promise<void> {
   if (!existsSync(STATUS_DIR)) {
