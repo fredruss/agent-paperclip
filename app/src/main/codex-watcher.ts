@@ -28,7 +28,8 @@ export function startDevCodexWatcher(): void {
   }
 
   const child = spawn(process.execPath, [watcherPath], {
-    stdio: 'ignore'
+    stdio: 'ignore',
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
   })
 
   devWatcherProcess = child

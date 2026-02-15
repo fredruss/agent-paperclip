@@ -109,7 +109,7 @@ describe('startDevCodexWatcher', () => {
     expect(mockSpawn).toHaveBeenCalledWith(
       process.execPath,
       ['/repo/codex/watcher.js'],
-      { stdio: 'ignore' }
+      { stdio: 'ignore', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }
     )
   })
 })
