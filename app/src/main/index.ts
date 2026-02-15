@@ -199,7 +199,7 @@ app.whenReady().then(async () => {
     const iconPath = join(__dirname, '../icon.png')
     if (existsSync(iconPath)) {
       const icon = nativeImage.createFromPath(iconPath)
-      app.dock.setIcon(icon)
+      app.dock?.setIcon(icon)
     }
   }
 

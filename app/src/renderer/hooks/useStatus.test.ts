@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useStatus } from './useStatus'
-import type { Status, StatusCallback } from '../../shared/types'
+import type { ElectronAPI, Status, StatusCallback } from '../../shared/types'
 
 describe('useStatus', () => {
   let mockGetStatus: ReturnType<typeof vi.fn>
@@ -21,8 +21,13 @@ describe('useStatus', () => {
     window.electronAPI = {
       getStatus: mockGetStatus,
       onStatusUpdate: mockOnStatusUpdate,
-      startDrag: vi.fn()
-    }
+      dragStart: vi.fn(),
+      dragMove: vi.fn(),
+      dragEnd: vi.fn(),
+      getActivePack: vi.fn(),
+      showPackMenu: vi.fn(),
+      onPackChanged: vi.fn(),
+    } as unknown as ElectronAPI
   })
 
   afterEach(() => {
