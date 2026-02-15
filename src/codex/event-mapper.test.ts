@@ -72,6 +72,26 @@ describe('mapCodexEvent', () => {
     expect(result).toEqual({ status: 'working', action: 'Running ls...' })
   })
 
+  it('maps escalated exec_command to waiting', () => {
+    const result = mapCodexEvent(entry('response_item', {
+      type: 'function_call',
+      name: 'exec_command',
+      arguments: '{"cmd":"docker ps","sandbox_permissions":"require_escalated"}',
+      call_id: 'call_1'
+    }))
+    expect(result).toEqual({ status: 'waiting', action: 'Awaiting approval for docker...' })
+  })
+
+  it('maps escalated exec_command without cmd to waiting', () => {
+    const result = mapCodexEvent(entry('response_item', {
+      type: 'function_call',
+      name: 'exec_command',
+      arguments: '{"sandbox_permissions":"require_escalated"}',
+      call_id: 'call_1'
+    }))
+    expect(result).toEqual({ status: 'waiting', action: 'Awaiting your approval...' })
+  })
+
   it('maps shell_command function_call to working', () => {
     const result = mapCodexEvent(entry('response_item', {
       type: 'function_call',

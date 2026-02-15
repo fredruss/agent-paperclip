@@ -49,7 +49,17 @@ function mapFunctionCall(payload: FunctionCallPayload): PetUpdate {
 
   if (name === 'exec_command' || name === 'shell_command') {
     try {
-      const args = JSON.parse(payload.arguments) as { cmd?: string }
+      const args = JSON.parse(payload.arguments) as {
+        cmd?: string
+        sandbox_permissions?: string
+      }
+      if (args.sandbox_permissions === 'require_escalated') {
+        if (args.cmd) {
+          const cmd = args.cmd.split(' ')[0]
+          return { status: 'waiting', action: `Awaiting approval for ${cmd}...` }
+        }
+        return { status: 'waiting', action: 'Awaiting your approval...' }
+      }
       if (args.cmd) {
         const cmd = args.cmd.split(' ')[0]
         return { status: 'working', action: `Running ${cmd}...` }
