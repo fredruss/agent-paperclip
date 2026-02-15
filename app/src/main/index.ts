@@ -39,7 +39,7 @@ function normalizeStatus(status: Status): Status {
     return { ...staleStatus, status: 'done', action: 'All done!' }
   }
   if (status.status === 'thinking' || status.status === 'working' || status.status === 'reading') {
-    return { ...staleStatus, status: 'idle', action: 'Waiting for Claude Code...' }
+    return { ...staleStatus, status: 'idle', action: 'Waiting for Agent...' }
   }
 
   return staleStatus
@@ -57,7 +57,7 @@ async function readStatus(): Promise<Status> {
     const status = JSON.parse(content) as Status
     return normalizeStatus(status)
   } catch {
-    return { status: 'idle', action: 'Waiting for Claude Code...', timestamp: Date.now() }
+    return { status: 'idle', action: 'Waiting for Agent...', timestamp: Date.now() }
   }
 }
 

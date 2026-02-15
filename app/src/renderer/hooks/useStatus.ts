@@ -5,7 +5,7 @@ export type { Status }
 
 const defaultStatus: Status = {
   status: 'idle',
-  action: 'Waiting for Claude Code...',
+  action: 'Waiting for Agent...',
   timestamp: Date.now()
 }
 
@@ -42,7 +42,7 @@ export function useStatus(): Status {
       idleTimeoutRef.current = setTimeout(() => {
         setStatus({
           status: 'idle',
-          action: 'Waiting for Claude Code...',
+          action: 'Waiting for Agent...',
           timestamp: Date.now()
         })
       }, IDLE_TIMEOUT_MS)

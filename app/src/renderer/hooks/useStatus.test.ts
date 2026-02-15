@@ -114,7 +114,7 @@ describe('useStatus', () => {
     })
 
     expect(result.current.status).toBe('idle')
-    expect(result.current.action).toBe('Waiting for Claude Code...')
+    expect(result.current.action).toBe('Waiting for Agent...')
 
     vi.useRealTimers()
   })
@@ -127,7 +127,7 @@ describe('useStatus', () => {
 
     // Should use default status
     expect(result.current.status).toBe('idle')
-    expect(result.current.action).toBe('Waiting for Claude Code...')
+    expect(result.current.action).toBe('Waiting for Agent...')
   })
 
   it('cleans up subscriptions on unmount', async () => {
@@ -254,7 +254,7 @@ describe('useStatus', () => {
 
     // Should still have default status
     expect(result.current.status).toBe('idle')
-    expect(result.current.action).toBe('Waiting for Claude Code...')
+    expect(result.current.action).toBe('Waiting for Agent...')
   })
 
   it('includes usage data when present', async () => {
