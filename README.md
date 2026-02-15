@@ -11,7 +11,7 @@ A desktop companion that lets you monitor Claude Code and Codex CLI. See when th
 ### Prerequisites
 
 - Node.js 18+
-- Claude Code CLI and/or Codex CLI (Codex supoort only tested on Mac)
+- Claude Code CLI and/or Codex CLI (Codex support only tested on Mac)
 
 ### Option 1: npm (recommended)
 

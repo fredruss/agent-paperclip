@@ -143,13 +143,17 @@ async function watchSession(sessionFile, onEvent) {
  */
 async function watchForFirstSession(onEvent) {
     let sessionWatcher = null;
+    let found = false;
     const dirWatcher = (0, chokidar_1.watch)(session_finder_1.SESSIONS_DIR, {
         persistent: true,
         depth: 3,
         ignoreInitial: true
     });
     dirWatcher.on('add', async (newPath) => {
+        if (found)
+            return;
         if (newPath.endsWith('.jsonl') && newPath.includes('rollout-')) {
+            found = true;
             // Found the first session file - switch to session watching
             await dirWatcher.close();
             sessionWatcher = await watchSession(newPath, onEvent);

@@ -59,11 +59,13 @@ async function start(): Promise<void> {
   }
 
   // Sessions directory doesn't exist yet - watch for it to appear
-  if (!existsSync(CODEX_HOME)) return
+  if (!existsSync(CODEX_HOME)) {
+    process.exit(0)
+  }
 
   const dirWatcher = watch(CODEX_HOME, { persistent: true, depth: 0, ignoreInitial: true })
   dirWatcher.on('addDir', async (dirPath: string) => {
-    if (dirPath.endsWith('sessions')) {
+    if (dirPath === SESSIONS_DIR) {
       await dirWatcher.close()
       await startSessionWatching()
     }
@@ -84,8 +86,8 @@ async function shutdown(): Promise<void> {
   process.exit(0)
 }
 
-process.on('SIGTERM', () => { shutdown() })
-process.on('SIGINT', () => { shutdown() })
+process.on('SIGTERM', () => { shutdown().catch(() => process.exit(1)) })
+process.on('SIGINT', () => { shutdown().catch(() => process.exit(1)) })
 
 start().catch((err) => {
   console.error('Codex watcher error:', err)

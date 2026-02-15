@@ -163,6 +163,7 @@ export async function watchForFirstSession(
   onEvent: EventCallback
 ): Promise<SessionWatcher> {
   let sessionWatcher: SessionWatcher | null = null
+  let found = false
 
   const dirWatcher = watch(SESSIONS_DIR, {
     persistent: true,
@@ -171,7 +172,9 @@ export async function watchForFirstSession(
   })
 
   dirWatcher.on('add', async (newPath: string) => {
+    if (found) return
     if (newPath.endsWith('.jsonl') && newPath.includes('rollout-')) {
+      found = true
       // Found the first session file - switch to session watching
       await dirWatcher.close()
       sessionWatcher = await watchSession(newPath, onEvent)

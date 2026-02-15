@@ -95,6 +95,7 @@ describe('startDevCodexWatcher', () => {
 
     expect(mockSpawn).not.toHaveBeenCalled()
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Codex watcher script not found'))
+    warnSpy.mockRestore()
   })
 
   it('spawns only once while the watcher process is active', async () => {

@@ -50,11 +50,12 @@ async function start() {
         return;
     }
     // Sessions directory doesn't exist yet - watch for it to appear
-    if (!(0, fs_1.existsSync)(session_finder_1.CODEX_HOME))
-        return;
+    if (!(0, fs_1.existsSync)(session_finder_1.CODEX_HOME)) {
+        process.exit(0);
+    }
     const dirWatcher = (0, chokidar_1.watch)(session_finder_1.CODEX_HOME, { persistent: true, depth: 0, ignoreInitial: true });
     dirWatcher.on('addDir', async (dirPath) => {
-        if (dirPath.endsWith('sessions')) {
+        if (dirPath === session_finder_1.SESSIONS_DIR) {
             await dirWatcher.close();
             await startSessionWatching();
         }
@@ -72,8 +73,8 @@ async function shutdown() {
     }
     process.exit(0);
 }
-process.on('SIGTERM', () => { shutdown(); });
-process.on('SIGINT', () => { shutdown(); });
+process.on('SIGTERM', () => { shutdown().catch(() => process.exit(1)); });
+process.on('SIGINT', () => { shutdown().catch(() => process.exit(1)); });
 start().catch((err) => {
     console.error('Codex watcher error:', err);
     process.exit(1);
