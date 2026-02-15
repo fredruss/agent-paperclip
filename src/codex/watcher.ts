@@ -23,6 +23,11 @@ let watcher: SessionWatcher | null = null
 let latestUsage: TokenUsage | undefined
 
 function handleEvent(entry: CodexRolloutEntry): void {
+  // A new session starts with session_meta; clear usage from any previous session.
+  if (entry.type === 'session_meta') {
+    latestUsage = undefined
+  }
+
   // Track usage from token_count events
   const usage = extractUsageFromEntry(entry)
   if (usage) latestUsage = usage

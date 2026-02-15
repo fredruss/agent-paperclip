@@ -22,9 +22,12 @@ function extractUsage(payload) {
     const info = payload.info;
     if (!info)
         return undefined;
-    const u = info.total_token_usage;
+    // Prefer last_token_usage to match Claude hook behavior (latest request usage).
+    // total_token_usage is cumulative across the full Codex session and can grow very large.
+    const u = info.last_token_usage ?? info.total_token_usage;
     return {
-        context: u.input_tokens + (u.cached_input_tokens || 0),
+        // Codex input_tokens already includes cached tokens; adding cached_input_tokens would double-count.
+        context: u.input_tokens,
         output: u.output_tokens
     };
 }

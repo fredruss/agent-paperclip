@@ -23,19 +23,26 @@ const STICKER_PACKS = [
 let activePack = 'bot1'
 const STALE_ACTIVITY_MS = 10_000
 
+function stripUsage(status: Status): Status {
+  const statusWithoutUsage = { ...status }
+  delete statusWithoutUsage.usage
+  return statusWithoutUsage
+}
+
 function normalizeStatus(status: Status): Status {
   const age = Date.now() - status.timestamp
   if (age < STALE_ACTIVITY_MS) return status
+  const staleStatus = stripUsage(status)
 
   // Transient activity states should not remain forever across app restarts.
   if (status.status === 'thinking' && status.action === 'Responding...') {
-    return { ...status, status: 'done', action: 'All done!' }
+    return { ...staleStatus, status: 'done', action: 'All done!' }
   }
   if (status.status === 'thinking' || status.status === 'working' || status.status === 'reading') {
-    return { ...status, status: 'idle', action: 'Waiting for Claude Code...' }
+    return { ...staleStatus, status: 'idle', action: 'Waiting for Claude Code...' }
   }
 
-  return status
+  return staleStatus
 }
 
 async function ensureStatusDir(): Promise<void> {

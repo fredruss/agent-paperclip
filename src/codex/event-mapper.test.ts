@@ -187,7 +187,28 @@ describe('mapCodexEvent', () => {
 })
 
 describe('extractUsageFromEntry', () => {
-  it('extracts usage from token_count event', () => {
+  it('prefers last_token_usage when available', () => {
+    const result = extractUsageFromEntry(entry('event_msg', {
+      type: 'token_count',
+      info: {
+        total_token_usage: {
+          input_tokens: 8000,
+          cached_input_tokens: 7000,
+          output_tokens: 300,
+          total_tokens: 8300
+        },
+        last_token_usage: {
+          input_tokens: 1200,
+          cached_input_tokens: 800,
+          output_tokens: 40,
+          total_tokens: 1240
+        }
+      }
+    }))
+    expect(result).toEqual({ context: 1200, output: 40 })
+  })
+
+  it('falls back to total_token_usage when last_token_usage is missing', () => {
     const result = extractUsageFromEntry(entry('event_msg', {
       type: 'token_count',
       info: {
@@ -199,7 +220,7 @@ describe('extractUsageFromEntry', () => {
         }
       }
     }))
-    expect(result).toEqual({ context: 15000, output: 300 })
+    expect(result).toEqual({ context: 8000, output: 300 })
   })
 
   it('returns undefined for non-token_count events', () => {

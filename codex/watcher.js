@@ -18,6 +18,10 @@ const event_mapper_1 = require("./event-mapper");
 let watcher = null;
 let latestUsage;
 function handleEvent(entry) {
+    // A new session starts with session_meta; clear usage from any previous session.
+    if (entry.type === 'session_meta') {
+        latestUsage = undefined;
+    }
     // Track usage from token_count events
     const usage = (0, event_mapper_1.extractUsageFromEntry)(entry);
     if (usage)

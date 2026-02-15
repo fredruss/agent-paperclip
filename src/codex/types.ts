@@ -64,6 +64,13 @@ export interface TokenCountPayload {
       reasoning_output_tokens?: number
       total_tokens: number
     }
+    last_token_usage?: {
+      input_tokens: number
+      cached_input_tokens?: number
+      output_tokens: number
+      reasoning_output_tokens?: number
+      total_tokens: number
+    }
     model_context_window?: number
   } | null
   rate_limits?: unknown
