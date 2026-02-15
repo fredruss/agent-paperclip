@@ -1,0 +1,155 @@
+/**
+ * Maps Codex session events to pet status updates.
+ *
+ * Pure functions, no I/O. Each function takes a parsed JSONL entry
+ * and returns a pet state update or null to ignore the event.
+ */
+
+import type { PetState, TokenUsage } from '../shared/types'
+import type {
+  CodexRolloutEntry,
+  EventMsgPayload,
+  ResponseItemPayload,
+  FunctionCallPayload,
+  CustomToolCallPayload,
+  TokenCountPayload
+} from './types'
+
+export interface PetUpdate {
+  status: PetState
+  action: string
+  usage?: TokenUsage
+}
+
+function truncateText(text: string, maxLength: number = 40): string {
+  if (text.length <= maxLength) return text
+  const truncated = text.slice(0, maxLength)
+  const lastSpace = truncated.lastIndexOf(' ')
+  if (lastSpace > maxLength * 0.6) {
+    return truncated.slice(0, lastSpace) + '...'
+  }
+  return truncated + '...'
+}
+
+function extractUsage(payload: TokenCountPayload): TokenUsage | undefined {
+  const info = payload.info
+  if (!info) return undefined
+  const u = info.total_token_usage
+  return {
+    context: u.input_tokens + (u.cached_input_tokens || 0),
+    output: u.output_tokens
+  }
+}
+
+function mapFunctionCall(payload: FunctionCallPayload): PetUpdate {
+  const { name } = payload
+
+  if (name === 'exec_command' || name === 'shell_command') {
+    try {
+      const args = JSON.parse(payload.arguments) as { cmd?: string }
+      if (args.cmd) {
+        const cmd = args.cmd.split(' ')[0]
+        return { status: 'working', action: `Running ${cmd}...` }
+      }
+    } catch {
+      // Fall through to generic
+    }
+    return { status: 'working', action: 'Running command...' }
+  }
+
+  if (name === 'apply_patch') {
+    return { status: 'working', action: 'Editing file...' }
+  }
+
+  if (name === 'read_mcp_resource') {
+    return { status: 'reading', action: 'Reading resource...' }
+  }
+
+  return { status: 'working', action: `Using ${name}...` }
+}
+
+function mapCustomToolCall(payload: CustomToolCallPayload): PetUpdate {
+  if (payload.name === 'apply_patch') {
+    return { status: 'working', action: 'Editing file...' }
+  }
+  return { status: 'working', action: `Using ${payload.name}...` }
+}
+
+function mapEventMsg(payload: EventMsgPayload): PetUpdate | null {
+  switch (payload.type) {
+    case 'user_message':
+      return { status: 'thinking', action: 'Thinking...' }
+
+    case 'agent_reasoning':
+      return {
+        status: 'thinking',
+        action: `Thinking: "${truncateText(payload.text)}"`
+      }
+
+    case 'agent_message':
+      return { status: 'thinking', action: 'Responding...' }
+
+    case 'token_count':
+      // Token count events only carry usage data, no state change
+      return null
+
+    default:
+      return null
+  }
+}
+
+function mapResponseItem(payload: ResponseItemPayload): PetUpdate | null {
+  switch (payload.type) {
+    case 'function_call':
+      return mapFunctionCall(payload)
+
+    case 'custom_tool_call':
+      return mapCustomToolCall(payload)
+
+    case 'function_call_output':
+    case 'custom_tool_call_output':
+      return { status: 'thinking', action: 'Thinking...' }
+
+    case 'message':
+      // Only care about assistant messages (agent responding)
+      if (payload.role === 'assistant') {
+        return { status: 'thinking', action: 'Responding...' }
+      }
+      return null
+
+    case 'reasoning':
+      return null
+
+    default:
+      return null
+  }
+}
+
+export function mapCodexEvent(entry: CodexRolloutEntry): PetUpdate | null {
+  switch (entry.type) {
+    case 'session_meta':
+      return { status: 'idle', action: 'Codex session started!' }
+
+    case 'turn_context':
+      return null
+
+    case 'event_msg':
+      return mapEventMsg(entry.payload as EventMsgPayload)
+
+    case 'response_item':
+      return mapResponseItem(entry.payload as ResponseItemPayload)
+
+    default:
+      return null
+  }
+}
+
+/**
+ * Extract usage from a token_count event_msg, if present.
+ */
+export function extractUsageFromEntry(entry: CodexRolloutEntry): TokenUsage | undefined {
+  if (entry.type !== 'event_msg') return undefined
+  const payload = entry.payload as EventMsgPayload
+  if (payload.type !== 'token_count') return undefined
+  return extractUsage(payload as TokenCountPayload)
+}

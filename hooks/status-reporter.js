@@ -19,10 +19,7 @@ exports.parseTranscript = parseTranscript;
 exports.handleEvent = handleEvent;
 const promises_1 = require("fs/promises");
 const fs_1 = require("fs");
-const path_1 = require("path");
-const os_1 = require("os");
-const STATUS_DIR = (0, path_1.join)((0, os_1.homedir)(), '.claude-companion');
-const STATUS_FILE = (0, path_1.join)(STATUS_DIR, 'status.json');
+const status_writer_1 = require("../lib/status-writer");
 // Tool name to human-readable action mapping
 const TOOL_ACTIONS = {
     Read: 'Reading file...',
@@ -55,11 +52,6 @@ const TOOL_STATES = {
     mcp__ide__getDiagnostics: 'reading',
     mcp__ide__executeCode: 'working'
 };
-async function ensureStatusDir() {
-    if (!(0, fs_1.existsSync)(STATUS_DIR)) {
-        await (0, promises_1.mkdir)(STATUS_DIR, { recursive: true });
-    }
-}
 /**
  * Truncate text to a maximum length, adding ellipsis if needed.
  * Tries to break at word boundaries.
@@ -143,18 +135,6 @@ async function parseTranscript(transcriptPath) {
         return { usage: null, thinking: null };
     }
 }
-async function writeStatus(status, action, usage = null) {
-    await ensureStatusDir();
-    const data = {
-        status,
-        action,
-        timestamp: Date.now()
-    };
-    if (usage) {
-        data.usage = usage;
-    }
-    await (0, promises_1.writeFile)(STATUS_FILE, JSON.stringify(data, null, 2));
-}
 async function handleEvent(event) {
     const { hook_event_name, tool_name, tool_input, tool_response, transcript_path } = event;
     // Parse token usage and thinking content from transcript
@@ -162,7 +142,7 @@ async function handleEvent(event) {
     switch (hook_event_name) {
         case 'UserPromptSubmit': {
             // Don't display user prompts for privacy - only show generic status
-            await writeStatus('thinking', 'Thinking...', usage);
+            await (0, status_writer_1.writeStatus)('thinking', 'Thinking...', usage);
             break;
         }
         case 'PreToolUse': {
@@ -188,42 +168,42 @@ async function handleEvent(event) {
             else if (tool_name === 'Grep' && tool_input?.pattern) {
                 action = `Searching for "${tool_input.pattern.slice(0, 20)}${tool_input.pattern.length > 20 ? '...' : ''}"...`;
             }
-            await writeStatus(state, action, usage);
+            await (0, status_writer_1.writeStatus)(state, action, usage);
             break;
         }
         case 'PostToolUse': {
             if (tool_response && tool_response.success === false) {
-                await writeStatus('error', 'Something went wrong...', usage);
+                await (0, status_writer_1.writeStatus)('error', 'Something went wrong...', usage);
             }
             else {
                 // Tool completed successfully - return to thinking state
                 // Show actual thinking content if available
                 const action = thinking ? `Thinking: "${thinking}"` : 'Thinking...';
-                await writeStatus('thinking', action, usage);
+                await (0, status_writer_1.writeStatus)('thinking', action, usage);
             }
             break;
         }
         case 'Stop': {
             // Stop event just indicates Claude finished - show "done" state
-            await writeStatus('done', 'All done!', usage);
+            await (0, status_writer_1.writeStatus)('done', 'All done!', usage);
             break;
         }
         case 'SessionStart': {
-            await writeStatus('idle', 'Session started!');
+            await (0, status_writer_1.writeStatus)('idle', 'Session started!');
             break;
         }
         case 'SessionEnd': {
-            await writeStatus('idle', 'Session ended', usage);
+            await (0, status_writer_1.writeStatus)('idle', 'Session ended', usage);
             break;
         }
         case 'Notification': {
             const { notification_type } = event;
             switch (notification_type) {
                 case 'permission_prompt':
-                    await writeStatus('waiting', 'Needs your permission...', usage);
+                    await (0, status_writer_1.writeStatus)('waiting', 'Needs your permission...', usage);
                     break;
                 case 'elicitation_dialog':
-                    await writeStatus('waiting', 'Has a question for you...', usage);
+                    await (0, status_writer_1.writeStatus)('waiting', 'Has a question for you...', usage);
                     break;
                 case 'idle_prompt':
                     // User has been idle for 60+ seconds - just ignore

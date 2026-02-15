@@ -23,6 +23,7 @@
     "scripts/",
     "hooks/",
     "lib/",
+    "codex/",
     "out/"
   ],
   "keywords": [

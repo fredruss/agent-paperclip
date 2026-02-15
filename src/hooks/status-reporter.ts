@@ -15,14 +15,10 @@
  * - SessionEnd: When a session ends
  */
 
-import { writeFile, mkdir, readFile } from 'fs/promises'
+import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
-import { join } from 'path'
-import { homedir } from 'os'
-import type { PetState, TokenUsage, Status, HookEvent } from '../shared/types'
-
-const STATUS_DIR = join(homedir(), '.claude-companion')
-const STATUS_FILE = join(STATUS_DIR, 'status.json')
+import type { PetState, TokenUsage, HookEvent } from '../shared/types'
+import { writeStatus } from '../lib/status-writer'
 
 // Tool name to human-readable action mapping
 const TOOL_ACTIONS: Record<string, string> = {
@@ -56,12 +52,6 @@ const TOOL_STATES: Record<string, PetState> = {
   AskUserQuestion: 'waiting',
   mcp__ide__getDiagnostics: 'reading',
   mcp__ide__executeCode: 'working'
-}
-
-async function ensureStatusDir(): Promise<void> {
-  if (!existsSync(STATUS_DIR)) {
-    await mkdir(STATUS_DIR, { recursive: true })
-  }
 }
 
 interface TranscriptData {
@@ -175,23 +165,6 @@ export async function parseTranscript(transcriptPath: string | undefined): Promi
   } catch {
     return { usage: null, thinking: null }
   }
-}
-
-async function writeStatus(
-  status: PetState,
-  action: string,
-  usage: TokenUsage | null = null
-): Promise<void> {
-  await ensureStatusDir()
-  const data: Status = {
-    status,
-    action,
-    timestamp: Date.now()
-  }
-  if (usage) {
-    data.usage = usage
-  }
-  await writeFile(STATUS_FILE, JSON.stringify(data, null, 2))
 }
 
 export async function handleEvent(event: HookEvent): Promise<void> {

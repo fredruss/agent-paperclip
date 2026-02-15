@@ -17,7 +17,11 @@ exports.stopAppWindows = stopAppWindows;
 exports.stopAppUnix = stopAppUnix;
 const child_process_1 = require("child_process");
 const path_1 = __importDefault(require("path"));
+const fs_1 = require("fs");
 const setup_1 = require("../lib/setup");
+const pid_1 = require("../lib/pid");
+const session_finder_1 = require("../codex/session-finder");
+const CODEX_WATCHER_PID_FILE = path_1.default.join(setup_1.COMPANION_DIR, 'codex-watcher.pid');
 async function runSetup() {
     console.log('\nClaude Code Companion Setup\n');
     console.log('This will configure Claude Code hooks to send status updates to the pet.');
@@ -44,6 +48,50 @@ async function runSetup() {
     console.log('\nSetup complete!');
     console.log('Run "claude-companion" to launch the desktop pet.\n');
 }
+function isCodexWatcher(pid) {
+    try {
+        const cmd = (0, child_process_1.execSync)(`ps -p ${pid} -o command=`, { encoding: 'utf-8' }).trim();
+        return cmd.includes('codex/watcher');
+    }
+    catch {
+        return false;
+    }
+}
+function launchCodexWatcher() {
+    // Skip if Codex isn't installed
+    if (!(0, fs_1.existsSync)(session_finder_1.CODEX_HOME))
+        return;
+    // Skip if already running (verify it's actually our watcher, not a stale PID)
+    const existingPid = (0, pid_1.readPid)(CODEX_WATCHER_PID_FILE);
+    if (existingPid && (0, pid_1.isProcessRunning)(existingPid) && isCodexWatcher(existingPid))
+        return;
+    const watcherPath = path_1.default.join(__dirname, '..', 'codex', 'watcher.js');
+    if (!(0, fs_1.existsSync)(watcherPath))
+        return;
+    const child = (0, child_process_1.spawn)(process.execPath, [watcherPath], {
+        detached: true,
+        stdio: 'ignore'
+    });
+    if (child.pid) {
+        (0, pid_1.writePid)(CODEX_WATCHER_PID_FILE, child.pid);
+    }
+    child.unref();
+}
+function stopCodexWatcher() {
+    const pid = (0, pid_1.readPid)(CODEX_WATCHER_PID_FILE);
+    if (!pid)
+        return;
+    // Only kill if the process is actually our watcher
+    if ((0, pid_1.isProcessRunning)(pid) && isCodexWatcher(pid)) {
+        try {
+            process.kill(pid, 'SIGTERM');
+        }
+        catch {
+            // Process may have already exited
+        }
+    }
+    (0, pid_1.removePid)(CODEX_WATCHER_PID_FILE);
+}
 function launchApp() {
     // Get the electron binary path from the installed electron package
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -57,6 +105,8 @@ function launchApp() {
     });
     // Unref to allow the parent process to exit independently
     child.unref();
+    // Also start the Codex watcher if Codex is installed
+    launchCodexWatcher();
     console.log('Claude Code Companion launched!');
 }
 function stopApp() {
@@ -66,6 +116,7 @@ function stopApp() {
     else {
         stopAppUnix();
     }
+    stopCodexWatcher();
 }
 function stopAppWindows() {
     try {

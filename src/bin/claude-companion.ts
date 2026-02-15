@@ -11,11 +11,17 @@
 
 import { spawn, execSync } from 'child_process'
 import path from 'path'
+import { existsSync } from 'fs'
 import {
   SETTINGS_FILE,
+  COMPANION_DIR,
   askConfirmation,
   runSetupSync
 } from '../lib/setup'
+import { writePid, readPid, isProcessRunning, removePid } from '../lib/pid'
+import { CODEX_HOME } from '../codex/session-finder'
+
+const CODEX_WATCHER_PID_FILE = path.join(COMPANION_DIR, 'codex-watcher.pid')
 
 async function runSetup(): Promise<void> {
   console.log('\nClaude Code Companion Setup\n')
@@ -50,6 +56,54 @@ async function runSetup(): Promise<void> {
   console.log('Run "claude-companion" to launch the desktop pet.\n')
 }
 
+function isCodexWatcher(pid: number): boolean {
+  try {
+    const cmd = execSync(`ps -p ${pid} -o command=`, { encoding: 'utf-8' }).trim()
+    return cmd.includes('codex/watcher')
+  } catch {
+    return false
+  }
+}
+
+function launchCodexWatcher(): void {
+  // Skip if Codex isn't installed
+  if (!existsSync(CODEX_HOME)) return
+
+  // Skip if already running (verify it's actually our watcher, not a stale PID)
+  const existingPid = readPid(CODEX_WATCHER_PID_FILE)
+  if (existingPid && isProcessRunning(existingPid) && isCodexWatcher(existingPid)) return
+
+  const watcherPath = path.join(__dirname, '..', 'codex', 'watcher.js')
+  if (!existsSync(watcherPath)) return
+
+  const child = spawn(process.execPath, [watcherPath], {
+    detached: true,
+    stdio: 'ignore'
+  })
+
+  if (child.pid) {
+    writePid(CODEX_WATCHER_PID_FILE, child.pid)
+  }
+
+  child.unref()
+}
+
+function stopCodexWatcher(): void {
+  const pid = readPid(CODEX_WATCHER_PID_FILE)
+  if (!pid) return
+
+  // Only kill if the process is actually our watcher
+  if (isProcessRunning(pid) && isCodexWatcher(pid)) {
+    try {
+      process.kill(pid, 'SIGTERM')
+    } catch {
+      // Process may have already exited
+    }
+  }
+
+  removePid(CODEX_WATCHER_PID_FILE)
+}
+
 function launchApp(): void {
   // Get the electron binary path from the installed electron package
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -67,6 +121,9 @@ function launchApp(): void {
   // Unref to allow the parent process to exit independently
   child.unref()
 
+  // Also start the Codex watcher if Codex is installed
+  launchCodexWatcher()
+
   console.log('Claude Code Companion launched!')
 }
 
@@ -76,6 +133,8 @@ export function stopApp(): void {
   } else {
     stopAppUnix()
   }
+
+  stopCodexWatcher()
 }
 
 export function stopAppWindows(): void {
