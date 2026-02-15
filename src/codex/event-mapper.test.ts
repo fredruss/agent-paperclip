@@ -27,6 +27,16 @@ describe('mapCodexEvent', () => {
     expect(result).toEqual({ status: 'thinking', action: 'Thinking...' })
   })
 
+  it('maps task_started to thinking', () => {
+    const result = mapCodexEvent(entry('event_msg', { type: 'task_started', turn_id: 'turn_1' }))
+    expect(result).toEqual({ status: 'thinking', action: 'Thinking...' })
+  })
+
+  it('maps task_complete to done', () => {
+    const result = mapCodexEvent(entry('event_msg', { type: 'task_complete', turn_id: 'turn_1' }))
+    expect(result).toEqual({ status: 'done', action: 'All done!' })
+  })
+
   it('maps agent_reasoning to thinking with text', () => {
     const result = mapCodexEvent(entry('event_msg', { type: 'agent_reasoning', text: 'Analyzing code' }))
     expect(result).toEqual({ status: 'thinking', action: 'Thinking: "Analyzing code"' })
@@ -137,6 +147,16 @@ describe('mapCodexEvent', () => {
       content: [{ type: 'output_text', text: 'hello' }]
     }))
     expect(result).toEqual({ status: 'thinking', action: 'Responding...' })
+  })
+
+  it('maps assistant final_answer message to done', () => {
+    const result = mapCodexEvent(entry('response_item', {
+      type: 'message',
+      role: 'assistant',
+      phase: 'final_answer',
+      content: [{ type: 'output_text', text: 'hello' }]
+    }))
+    expect(result).toEqual({ status: 'done', action: 'All done!' })
   })
 
   it('returns null for developer/user messages', () => {

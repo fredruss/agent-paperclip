@@ -77,6 +77,12 @@ function mapCustomToolCall(payload: CustomToolCallPayload): PetUpdate {
 
 function mapEventMsg(payload: EventMsgPayload): PetUpdate | null {
   switch (payload.type) {
+    case 'task_started':
+      return { status: 'thinking', action: 'Thinking...' }
+
+    case 'task_complete':
+      return { status: 'done', action: 'All done!' }
+
     case 'user_message':
       return { status: 'thinking', action: 'Thinking...' }
 
@@ -113,6 +119,9 @@ function mapResponseItem(payload: ResponseItemPayload): PetUpdate | null {
     case 'message':
       // Only care about assistant messages (agent responding)
       if (payload.role === 'assistant') {
+        if (payload.phase === 'final_answer') {
+          return { status: 'done', action: 'All done!' }
+        }
         return { status: 'thinking', action: 'Responding...' }
       }
       return null

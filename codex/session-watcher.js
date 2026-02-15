@@ -7,11 +7,42 @@
  * to watching them.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.parseJsonlChunk = parseJsonlChunk;
 exports.watchSession = watchSession;
 exports.watchForFirstSession = watchForFirstSession;
 const promises_1 = require("fs/promises");
 const chokidar_1 = require("chokidar");
 const session_finder_1 = require("./session-finder");
+/**
+ * Parse a chunk of JSONL text while preserving incomplete trailing lines.
+ */
+function parseJsonlChunk(chunk, previousRemainder = '') {
+    const combined = previousRemainder + chunk;
+    const lines = combined.split('\n');
+    let remainder = lines.pop() ?? '';
+    const entries = [];
+    for (const line of lines) {
+        if (!line.trim())
+            continue;
+        try {
+            entries.push(JSON.parse(line));
+        }
+        catch {
+            // Skip malformed lines.
+        }
+    }
+    // Handle JSONL files that may not end with a newline.
+    if (remainder.trim()) {
+        try {
+            entries.push(JSON.parse(remainder));
+            remainder = '';
+        }
+        catch {
+            // Keep incomplete trailing JSON for the next read.
+        }
+    }
+    return { entries, remainder };
+}
 /**
  * Start watching a session file for new events.
  * Calls onEvent for each new JSONL entry appended to the file.
@@ -23,6 +54,7 @@ async function watchSession(sessionFile, onEvent) {
     let offset = 0;
     let reading = false;
     let dirty = false;
+    let lineRemainder = '';
     // Start from current file size (don't replay old events)
     try {
         const fileStat = await (0, promises_1.stat)(currentFile);
@@ -48,17 +80,10 @@ async function watchSession(sessionFile, onEvent) {
                 await fd.read(buf, 0, buf.length, offset);
                 offset = fileStat.size;
                 const newContent = buf.toString('utf8');
-                const lines = newContent.split('\n');
-                for (const line of lines) {
-                    if (!line.trim())
-                        continue;
-                    try {
-                        const entry = JSON.parse(line);
-                        onEvent(entry);
-                    }
-                    catch {
-                        // Skip malformed lines
-                    }
+                const parsed = parseJsonlChunk(newContent, lineRemainder);
+                lineRemainder = parsed.remainder;
+                for (const entry of parsed.entries) {
+                    onEvent(entry);
                 }
             }
             finally {
@@ -94,6 +119,7 @@ async function watchSession(sessionFile, onEvent) {
                 currentFile = newPath;
                 watchedPath = newPath;
                 offset = 0;
+                lineRemainder = '';
                 fileWatcher.unwatch(oldPath);
                 fileWatcher.add(newPath);
                 readNewContent();

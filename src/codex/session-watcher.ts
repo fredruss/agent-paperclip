@@ -18,6 +18,42 @@ export interface SessionWatcher {
   close(): Promise<void>
 }
 
+export interface ParsedChunk {
+  entries: CodexRolloutEntry[]
+  remainder: string
+}
+
+/**
+ * Parse a chunk of JSONL text while preserving incomplete trailing lines.
+ */
+export function parseJsonlChunk(chunk: string, previousRemainder: string = ''): ParsedChunk {
+  const combined = previousRemainder + chunk
+  const lines = combined.split('\n')
+  let remainder = lines.pop() ?? ''
+  const entries: CodexRolloutEntry[] = []
+
+  for (const line of lines) {
+    if (!line.trim()) continue
+    try {
+      entries.push(JSON.parse(line) as CodexRolloutEntry)
+    } catch {
+      // Skip malformed lines.
+    }
+  }
+
+  // Handle JSONL files that may not end with a newline.
+  if (remainder.trim()) {
+    try {
+      entries.push(JSON.parse(remainder) as CodexRolloutEntry)
+      remainder = ''
+    } catch {
+      // Keep incomplete trailing JSON for the next read.
+    }
+  }
+
+  return { entries, remainder }
+}
+
 /**
  * Start watching a session file for new events.
  * Calls onEvent for each new JSONL entry appended to the file.
@@ -32,6 +68,7 @@ export async function watchSession(
   let offset = 0
   let reading = false
   let dirty = false
+  let lineRemainder = ''
 
   // Start from current file size (don't replay old events)
   try {
@@ -59,16 +96,11 @@ export async function watchSession(
         offset = fileStat.size
 
         const newContent = buf.toString('utf8')
-        const lines = newContent.split('\n')
+        const parsed = parseJsonlChunk(newContent, lineRemainder)
+        lineRemainder = parsed.remainder
 
-        for (const line of lines) {
-          if (!line.trim()) continue
-          try {
-            const entry = JSON.parse(line) as CodexRolloutEntry
-            onEvent(entry)
-          } catch {
-            // Skip malformed lines
-          }
+        for (const entry of parsed.entries) {
+          onEvent(entry)
         }
       } finally {
         await fd.close()
@@ -104,6 +136,7 @@ export async function watchSession(
         currentFile = newPath
         watchedPath = newPath
         offset = 0
+        lineRemainder = ''
 
         fileWatcher.unwatch(oldPath)
         fileWatcher.add(newPath)

@@ -36,6 +36,8 @@ export type EventMsgPayload =
   | AgentMessagePayload
   | AgentReasoningPayload
   | TokenCountPayload
+  | TaskStartedPayload
+  | TaskCompletePayload
 
 export interface UserMessagePayload {
   type: 'user_message'
@@ -65,6 +67,19 @@ export interface TokenCountPayload {
     model_context_window?: number
   } | null
   rate_limits?: unknown
+}
+
+export interface TaskStartedPayload {
+  type: 'task_started'
+  turn_id: string
+  model_context_window?: number
+  collaboration_mode_kind?: string
+}
+
+export interface TaskCompletePayload {
+  type: 'task_complete'
+  turn_id: string
+  last_agent_message?: string
 }
 
 // response_item subtypes
