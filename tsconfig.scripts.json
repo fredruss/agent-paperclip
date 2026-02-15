@@ -16,7 +16,8 @@
     "src/bin/**/*.ts",
     "src/scripts/**/*.ts",
     "src/shared/**/*.ts",
-    "src/lib/**/*.ts"
+    "src/lib/**/*.ts",
+    "src/codex/**/*.ts"
   ],
   "exclude": [
     "node_modules",

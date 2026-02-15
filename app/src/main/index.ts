@@ -5,6 +5,7 @@ import { readFile, mkdir, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
 import type { Status } from '../shared/types'
+import { startDevCodexWatcher, stopDevCodexWatcher } from './codex-watcher'
 
 const STATUS_DIR = join(homedir(), '.claude-companion')
 const STATUS_FILE = join(STATUS_DIR, 'status.json')
@@ -20,6 +21,29 @@ const STICKER_PACKS = [
 ]
 
 let activePack = 'bot1'
+const STALE_ACTIVITY_MS = 10_000
+
+function stripUsage(status: Status): Status {
+  const statusWithoutUsage = { ...status }
+  delete statusWithoutUsage.usage
+  return statusWithoutUsage
+}
+
+function normalizeStatus(status: Status): Status {
+  const age = Date.now() - status.timestamp
+  if (age < STALE_ACTIVITY_MS) return status
+  const staleStatus = stripUsage(status)
+
+  // Transient activity states should not remain forever across app restarts.
+  if (status.status === 'thinking' && status.action === 'Responding...') {
+    return { ...staleStatus, status: 'done', action: 'All done!' }
+  }
+  if (status.status === 'thinking' || status.status === 'working' || status.status === 'reading') {
+    return { ...staleStatus, status: 'idle', action: 'Waiting for Agent...' }
+  }
+
+  return staleStatus
+}
 
 async function ensureStatusDir(): Promise<void> {
   if (!existsSync(STATUS_DIR)) {
@@ -30,9 +54,10 @@ async function ensureStatusDir(): Promise<void> {
 async function readStatus(): Promise<Status> {
   try {
     const content = await readFile(STATUS_FILE, 'utf-8')
-    return JSON.parse(content)
+    const status = JSON.parse(content) as Status
+    return normalizeStatus(status)
   } catch {
-    return { status: 'idle', action: 'Waiting for Claude Code...', timestamp: Date.now() }
+    return { status: 'idle', action: 'Waiting for Agent...', timestamp: Date.now() }
   }
 }
 
@@ -164,6 +189,7 @@ ipcMain.on('show-pack-menu', () => {
 app.whenReady().then(async () => {
   app.setName('Claude Code Companion')
   await ensureStatusDir()
+  startDevCodexWatcher()
   await loadSettings()
   createWindow()
   setupStatusWatcher()
@@ -173,7 +199,7 @@ app.whenReady().then(async () => {
     const iconPath = join(__dirname, '../icon.png')
     if (existsSync(iconPath)) {
       const icon = nativeImage.createFromPath(iconPath)
-      app.dock.setIcon(icon)
+      app.dock?.setIcon(icon)
     }
   }
 
@@ -191,4 +217,8 @@ app.on('activate', () => {
   if (mainWindow === null) {
     createWindow()
   }
+})
+
+app.on('before-quit', () => {
+  stopDevCodexWatcher()
 })

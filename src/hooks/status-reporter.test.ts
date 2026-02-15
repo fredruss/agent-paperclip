@@ -2,11 +2,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { HookEvent } from '../shared/types'
 
-// Mock fs and fs/promises before any imports that might use them
+// Mock fs for parseTranscript's existsSync/readFile
 const mockExistsSync = vi.fn()
-const mockWriteFile = vi.fn()
-const mockMkdir = vi.fn()
 const mockReadFile = vi.fn()
+const mockWriteStatus = vi.fn()
 
 vi.mock('fs', () => ({
   default: { existsSync: mockExistsSync },
@@ -14,14 +13,12 @@ vi.mock('fs', () => ({
 }))
 
 vi.mock('fs/promises', () => ({
-  default: {
-    writeFile: mockWriteFile,
-    mkdir: mockMkdir,
-    readFile: mockReadFile
-  },
-  writeFile: mockWriteFile,
-  mkdir: mockMkdir,
+  default: { readFile: mockReadFile },
   readFile: mockReadFile
+}))
+
+vi.mock('../lib/status-writer', () => ({
+  writeStatus: mockWriteStatus
 }))
 
 // Now import the module under test
@@ -31,8 +28,7 @@ describe('handleEvent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockExistsSync.mockReturnValue(true)
-    mockWriteFile.mockResolvedValue(undefined)
-    mockMkdir.mockResolvedValue(undefined)
+    mockWriteStatus.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -47,10 +43,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "thinking"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('thinking', 'Thinking...', null)
   })
 
   it('returns reading state for Read tool', async () => {
@@ -62,10 +55,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "reading"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('reading', 'Reading file.ts...', null)
   })
 
   it('returns reading state for Glob tool', async () => {
@@ -76,10 +66,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "reading"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('reading', 'Searching files...', null)
   })
 
   it('returns reading state for Grep tool', async () => {
@@ -91,9 +78,10 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "reading"')
+    expect(mockWriteStatus).toHaveBeenCalledWith(
+      'reading',
+      'Searching for "searchPattern"...',
+      null
     )
   })
 
@@ -106,10 +94,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "working"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('working', 'Editing file.ts...', null)
   })
 
   it('returns working state for Write tool', async () => {
@@ -121,10 +106,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "working"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('working', 'Writing file.ts...', null)
   })
 
   it('returns working state for Bash tool', async () => {
@@ -136,10 +118,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "working"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('working', 'Running npm...', null)
   })
 
   it('returns done state for Stop event', async () => {
@@ -149,10 +128,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "done"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('done', 'All done!', null)
   })
 
   it('extracts filename from file_path in tool_input for Read', async () => {
@@ -164,10 +140,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('Reading myfile.ts')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('reading', 'Reading myfile.ts...', null)
   })
 
   it('extracts filename from file_path for Write', async () => {
@@ -179,10 +152,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('Writing newfile.js')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('working', 'Writing newfile.js...', null)
   })
 
   it('extracts filename from file_path for Edit', async () => {
@@ -194,10 +164,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('Editing component.tsx')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('working', 'Editing component.tsx...', null)
   })
 
   it('truncates long patterns in Grep tool', async () => {
@@ -210,9 +177,10 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining(`\\"${longPattern.slice(0, 20)}...\\"`)
+    expect(mockWriteStatus).toHaveBeenCalledWith(
+      'reading',
+      `Searching for "${longPattern.slice(0, 20)}..."...`,
+      null
     )
   })
 
@@ -225,10 +193,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('Running npm')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('working', 'Running npm...', null)
   })
 
   it('returns waiting state for permission_prompt Notification', async () => {
@@ -239,10 +204,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "waiting"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('waiting', 'Needs your permission...', null)
   })
 
   it('returns waiting state for elicitation_dialog Notification', async () => {
@@ -253,10 +215,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "waiting"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('waiting', 'Has a question for you...', null)
   })
 
   it('returns error state for failed PostToolUse', async () => {
@@ -267,10 +226,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "error"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('error', 'Something went wrong...', null)
   })
 
   it('returns thinking state for successful PostToolUse', async () => {
@@ -281,10 +237,7 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"status": "thinking"')
-    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('thinking', 'Thinking...', null)
   })
 })
 
