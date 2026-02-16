@@ -18,10 +18,11 @@ let mainWindow: BrowserWindow | null = null
 const STICKER_PACKS = [
   { id: 'bot1', name: 'Bot1' },
   { id: 'cloud', name: 'Cloud' },
+  { id: 'paperclip', name: 'Paperclip' },
   { id: 'svg', name: 'SVG' }
 ]
 
-let activePack = 'bot1'
+let activePack = 'paperclip'
 const STALE_ACTIVITY_MS = 10_000
 
 function stripUsage(status: Status): Status {
