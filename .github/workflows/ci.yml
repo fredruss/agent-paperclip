@@ -33,7 +33,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: app
-        run: npm install
+        run: rm package-lock.json && npm install
 
       - name: Lint
         working-directory: app
