@@ -1,10 +1,10 @@
 # Agent Paperclip
 
-<img src="app/resources/icon.png" width="128" alt="Agent Paperclip icon">
+<img src="app/resources/agent-paperclip-screenshot.png" width="128" alt="Agent Paperclip icon">
 
 A desktop companion that lets you monitor your AI coding agent. See when the agent is done, when it needs input, and how much context has been used without having to stare at your terminal. Also, it's cute.
 
-<img src="app/resources/ccc-gif.gif" width="200" alt="Screenshot of Agent Paperclip showing the pet with a speech bubble and token count">
+<img src="app/resources/agent-paperclip-gif.gif" width="200" alt="Screenshot of Agent Paperclip showing the pet with a speech bubble and token count">
 
 ## Installation
 
@@ -63,6 +63,10 @@ The pet window will appear and float on top of other windows. It automatically u
 - **Error** - Something went wrong
 
 The pet also displays the context window usage (input + cache tokens from the latest API call).
+
+<img src="app/resources/agent-paperclip-all-stickers.png" width="800" alt="Screenshot of all Agent Paperclip stickers">
+
+3 sticker packs available.
 
 <img src="app/resources/ccc-all-stickers.png" width="800" alt="Screenshot of all Agent Paperclip stickers">
 
