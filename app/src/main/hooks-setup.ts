@@ -3,7 +3,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 
-export const STATUS_DIR = join(homedir(), '.claude-companion')
+export const STATUS_DIR = join(homedir(), '.agent-paperclip')
 export const COMPANION_HOOKS_DIR = join(STATUS_DIR, 'hooks')
 export const CLAUDE_DIR = join(homedir(), '.claude')
 export const CLAUDE_SETTINGS_FILE = join(CLAUDE_DIR, 'settings.json')
@@ -29,9 +29,9 @@ export async function isHookConfigured(): Promise<boolean> {
   try {
     const content = await readFile(CLAUDE_SETTINGS_FILE, 'utf-8')
     const settings = JSON.parse(content)
-    // Check if any hook references claude-companion
+    // Check if any hook references agent-paperclip (or old claude-companion name)
     const hooksStr = JSON.stringify(settings.hooks || {})
-    return hooksStr.includes('claude-companion')
+    return hooksStr.includes('agent-paperclip') || hooksStr.includes('claude-companion')
   } catch {
     return false
   }
@@ -44,11 +44,11 @@ export interface SetupHooksOptions {
 export async function setupHooks(options: SetupHooksOptions): Promise<void> {
   // Check if hooks are already configured
   if (await isHookConfigured()) {
-    console.log('Claude Code Companion hooks already configured')
+    console.log('Agent Paperclip hooks already configured')
     return
   }
 
-  console.log('Setting up Claude Code Companion hooks...')
+  console.log('Setting up Agent Paperclip hooks...')
 
   // Ensure directories exist
   if (!existsSync(COMPANION_HOOKS_DIR)) {
@@ -58,7 +58,7 @@ export async function setupHooks(options: SetupHooksOptions): Promise<void> {
     await mkdir(CLAUDE_DIR, { recursive: true })
   }
 
-  // Copy hook script to ~/.claude-companion/hooks/
+  // Copy hook script to ~/.agent-paperclip/hooks/
   const sourcePath = options.getHookSourcePath()
   const destPath = join(COMPANION_HOOKS_DIR, 'status-reporter.js')
 
@@ -98,10 +98,12 @@ export async function setupHooks(options: SetupHooksOptions): Promise<void> {
     if (!hooks[eventName]) {
       hooks[eventName] = []
     }
-    // Check if claude-companion hook already exists
+    // Check if agent-paperclip hook already exists (also match old name for upgrades)
     const hookArray = hooks[eventName] as Array<{ hooks?: Array<{ command?: string }> }>
     const existingIndex = hookArray.findIndex(
-      (h) => h.hooks?.some((hook) => hook.command?.includes('claude-companion'))
+      (h) => h.hooks?.some((hook) =>
+        hook.command?.includes('agent-paperclip') || hook.command?.includes('claude-companion')
+      )
     )
     if (existingIndex >= 0) {
       hookArray[existingIndex] = eventHooks[0] as (typeof hookArray)[number]

@@ -1,9 +1,9 @@
 {
-  "name": "@fredruss/claude-code-companion",
-  "version": "0.9.1",
-  "description": "Desktop pet that shows Claude Code's real-time status",
+  "name": "agent-paperclip",
+  "version": "1.0.0",
+  "description": "Desktop pet that shows your AI coding agent's real-time status",
   "bin": {
-    "claude-companion": "./bin/claude-companion.js"
+    "agent-paperclip": "./bin/agent-paperclip.js"
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
@@ -28,17 +28,17 @@
     "out/"
   ],
   "keywords": [
-    "claude",
+    "agent-paperclip",
+    "paperclip",
     "claude-code",
     "desktop-pet",
-    "electron",
-    "companion"
+    "electron"
   ],
   "author": "",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fredruss/claude-companion"
+    "url": "https://github.com/fredruss/agent-paperclip"
   },
   "engines": {
     "node": ">=18"

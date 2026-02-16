@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Claude Code Companion CLI
+ * Agent Paperclip CLI
  *
  * Commands:
- *   claude-companion       - Launch the desktop pet app
- *   claude-companion stop  - Stop the running app
- *   claude-companion setup - Configure Claude Code hooks (with confirmation)
+ *   agent-paperclip       - Launch the desktop pet app
+ *   agent-paperclip stop  - Stop the running app
+ *   agent-paperclip setup - Configure Claude Code hooks (with confirmation)
  */
 
 import { spawn, execSync } from 'child_process'
@@ -24,7 +24,7 @@ import { CODEX_HOME } from '../codex/session-finder'
 const CODEX_WATCHER_PID_FILE = path.join(COMPANION_DIR, 'codex-watcher.pid')
 
 async function runSetup(): Promise<void> {
-  console.log('\nClaude Code Companion Setup\n')
+  console.log('\nAgent Paperclip Setup\n')
   console.log('This will configure Claude Code hooks to send status updates to the pet.')
   console.log('The following file will be modified:')
   console.log(`  ${SETTINGS_FILE}\n`)
@@ -53,7 +53,7 @@ async function runSetup(): Promise<void> {
   }
   console.log(`Updated Claude Code settings at ${result.settingsPath}`)
   console.log('\nSetup complete!')
-  console.log('Run "claude-companion" to launch the desktop pet.\n')
+  console.log('Run "agent-paperclip" to launch the desktop pet.\n')
 }
 
 function isCodexWatcher(pid: number): boolean {
@@ -132,7 +132,7 @@ function launchApp(): void {
   // Also start the Codex watcher if Codex is installed
   launchCodexWatcher()
 
-  console.log('Claude Code Companion launched!')
+  console.log('Agent Paperclip launched!')
 }
 
 export function stopApp(): void {
@@ -147,8 +147,8 @@ export function stopApp(): void {
 
 export function stopAppWindows(): void {
   try {
-    // Pattern matches both local dev (claude-companion) and npm-installed (claude-code-companion)
-    const pattern = '*companion*out*main*index.js*'
+    // Pattern matches both local dev and npm-installed (agent-paperclip)
+    const pattern = '*agent-paperclip*out*main*index.js*'
 
     // Use PowerShell to find electron processes (replacement for deprecated wmic)
     const findScript =
@@ -161,7 +161,7 @@ export function stopAppWindows(): void {
     }).trim()
 
     if (!output) {
-      console.log('Claude Code Companion is not running.')
+      console.log('Agent Paperclip is not running.')
       return
     }
 
@@ -174,21 +174,21 @@ export function stopAppWindows(): void {
         // Ignore errors - child processes may already be terminated
       }
     }
-    console.log('Claude Code Companion stopped.')
+    console.log('Agent Paperclip stopped.')
   } catch {
-    console.log('Claude Code Companion is not running.')
+    console.log('Agent Paperclip is not running.')
   }
 }
 
 export function stopAppUnix(): void {
   try {
-    // Kill Electron processes running claude-companion
-    // Match the app path argument: .../claude-code-companion/out/main/index.js
-    execSync('pkill -f "claude-code-companion/out/main"', { stdio: 'ignore' })
-    console.log('Claude Code Companion stopped.')
+    // Kill Electron processes running agent-paperclip
+    // Match the app path argument: .../agent-paperclip/out/main/index.js
+    execSync('pkill -f "agent-paperclip/out/main"', { stdio: 'ignore' })
+    console.log('Agent Paperclip stopped.')
   } catch {
     // pkill returns non-zero if no processes matched
-    console.log('Claude Code Companion is not running.')
+    console.log('Agent Paperclip is not running.')
   }
 }
 
@@ -202,7 +202,7 @@ async function main(): Promise<void> {
   } else if (command === undefined) {
     launchApp()
   } else {
-    console.log('Usage: claude-companion [command]')
+    console.log('Usage: agent-paperclip [command]')
     console.log('')
     console.log('Commands:')
     console.log('  (none)  Launch the desktop pet')

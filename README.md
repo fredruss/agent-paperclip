@@ -1,10 +1,10 @@
-# Claude Code Companion
+# Agent Paperclip
 
-<img src="app/resources/icon.png" width="128" alt="Claude Code Companion icon">
+<img src="app/resources/icon.png" width="128" alt="Agent Paperclip icon">
 
-A desktop companion that lets you monitor Claude Code and Codex CLI. See when the agent is done, when it needs input, and how much context has been used without having to stare at your terminal. Also, it's cute.
+A desktop companion that lets you monitor your AI coding agent. See when the agent is done, when it needs input, and how much context has been used without having to stare at your terminal. Also, it's cute.
 
-<img src="app/resources/ccc-gif.gif" width="200" alt="Screenshot of Claude Code Companion showing the pet with a speech bubble and token count">
+<img src="app/resources/ccc-gif.gif" width="200" alt="Screenshot of Agent Paperclip showing the pet with a speech bubble and token count">
 
 ## Installation
 
@@ -16,22 +16,22 @@ A desktop companion that lets you monitor Claude Code and Codex CLI. See when th
 ### Option 1: npm (recommended)
 
 ```bash
-npm install -g @fredruss/claude-code-companion
+npm install -g agent-paperclip
 ```
 
 After installing, configure the Claude Code hooks:
 
 ```bash
-claude-companion setup
+agent-paperclip setup
 ```
 
 Then launch the app:
 
 ```bash
-claude-companion
+agent-paperclip
 ```
 
-To stop: run `claude-companion stop`, use Cmd+Q, or quit from the dock.
+To stop: run `agent-paperclip stop`, use Cmd+Q, or quit from the dock.
 
 Codex support is automatic -- if `~/.codex/` exists, a background watcher picks up Codex sessions with no extra setup.
 
@@ -39,8 +39,8 @@ Codex support is automatic -- if `~/.codex/` exists, a background watcher picks 
 
 1. Clone and install:
    ```bash
-   git clone https://github.com/fredruss/claude-companion
-   cd claude-companion
+   git clone https://github.com/fredruss/agent-paperclip
+   cd agent-paperclip
    npm install
    ```
    This installs dependencies and prompts to configure Claude Code hooks. Type `y` to allow.
@@ -64,7 +64,7 @@ The pet window will appear and float on top of other windows. It automatically u
 
 The pet also displays the context window usage (input + cache tokens from the latest API call).
 
-<img src="app/resources/ccc-all-stickers.png" width="800" alt="Screenshot of all Claude Code Companion stickers">
+<img src="app/resources/ccc-all-stickers.png" width="800" alt="Screenshot of all Agent Paperclip stickers">
 
 ### Controls
 
@@ -87,11 +87,11 @@ Claude Code --[hooks]--> status-reporter.js --> status.json <--[watching]-- Desk
 Codex CLI --> ~/.codex/sessions/*.jsonl <--[tailing]-- codex-watcher --> status.json <--[watching]-- Desktop Pet
 ```
 
-Both write to the same `~/.claude-companion/status.json`, so the pet reflects whichever agent is currently active.
+Both write to the same `~/.agent-paperclip/status.json`, so the pet reflects whichever agent is currently active.
 
 ## Privacy
 
-The companion displays status information from `~/.claude-companion/status.json`.
+The companion displays status information from `~/.agent-paperclip/status.json`.
 
 **What IS captured in status.json:**
 - **Tool names** - Read, Write, Bash, Grep, etc.
@@ -136,10 +136,10 @@ Note: macOS builds will show a security warning unless code-signed with an Apple
 Check that the hooks are configured in `~/.claude/settings.json`:
 
 ```bash
-cat ~/.claude/settings.json | grep claude-companion
+cat ~/.claude/settings.json | grep agent-paperclip
 ```
 
-If hooks are missing, run `claude-companion setup` to configure them.
+If hooks are missing, run `agent-paperclip setup` to configure them.
 
 ### Pet doesn't update when using Codex
 

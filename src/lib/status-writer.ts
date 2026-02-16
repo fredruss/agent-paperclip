@@ -1,7 +1,7 @@
 /**
- * Shared status writer for Claude Companion
+ * Shared status writer for Agent Paperclip
  *
- * Writes pet status updates to ~/.claude-companion/status.json.
+ * Writes pet status updates to ~/.agent-paperclip/status.json.
  * Used by both the Claude Code hook reporter and the Codex watcher.
  */
 
@@ -11,7 +11,7 @@ import { join } from 'path'
 import { homedir } from 'os'
 import type { PetState, TokenUsage, Status } from '../shared/types'
 
-export const STATUS_DIR = join(homedir(), '.claude-companion')
+export const STATUS_DIR = join(homedir(), '.agent-paperclip')
 export const STATUS_FILE = join(STATUS_DIR, 'status.json')
 let writeChain: Promise<void> = Promise.resolve()
 

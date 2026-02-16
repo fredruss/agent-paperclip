@@ -7,7 +7,7 @@ import { homedir } from 'os'
 import type { Status } from '../shared/types'
 import { startDevCodexWatcher, stopDevCodexWatcher } from './codex-watcher'
 
-const STATUS_DIR = join(homedir(), '.claude-companion')
+const STATUS_DIR = join(homedir(), '.agent-paperclip')
 const STATUS_FILE = join(STATUS_DIR, 'status.json')
 const SETTINGS_FILE = join(STATUS_DIR, 'settings.json')
 const debug = !!process.env.COMPANION_DEBUG
@@ -203,7 +203,7 @@ ipcMain.on('show-pack-menu', () => {
 })
 
 app.whenReady().then(async () => {
-  app.setName('Claude Code Companion')
+  app.setName('Agent Paperclip')
   await ensureStatusDir()
   startDevCodexWatcher()
   await loadSettings()

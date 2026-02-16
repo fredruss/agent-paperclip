@@ -1,12 +1,12 @@
 {
-  "name": "claude-code-companion-dev",
+  "name": "agent-paperclip-dev",
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "description": "Desktop pet companion for Claude Code (development)",
+  "description": "Desktop pet that shows your AI coding agent's real-time status (development)",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fredruss/claude-companion.git"
+    "url": "https://github.com/fredruss/agent-paperclip.git"
   },
   "main": "./out/main/index.js",
   "author": "",

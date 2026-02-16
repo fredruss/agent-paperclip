@@ -1,5 +1,5 @@
-appId: com.claude-companion.app
-productName: Claude Code Companion
+appId: com.agent-paperclip.app
+productName: Agent Paperclip
 directories:
   output: dist
   buildResources: resources

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Codex Companion Watcher
+ * Codex Watcher for Agent Paperclip
  *
  * Long-lived process that tails Codex session files and writes
- * pet status updates to ~/.claude-companion/status.json.
+ * pet status updates to ~/.agent-paperclip/status.json.
  *
- * Launched automatically by `claude-companion` when ~/.codex/ exists.
+ * Launched automatically by `agent-paperclip` when ~/.codex/ exists.
  */
 
 import { existsSync } from 'fs'

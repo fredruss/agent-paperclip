@@ -62,7 +62,7 @@ describe('writeStatus', () => {
     await writeStatus('idle', 'Ready')
 
     expect(mockMkdir).toHaveBeenCalledWith(
-      expect.stringContaining('.claude-companion'),
+      expect.stringContaining('.agent-paperclip'),
       { recursive: true }
     )
   })

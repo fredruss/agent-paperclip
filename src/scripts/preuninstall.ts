@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Claude Code Companion Pre-uninstall Script
+ * Agent Paperclip Pre-uninstall Script
  *
  * Removes Claude Code hooks configuration.
  * - Removes hook entries from ~/.claude/settings.json
- * - Deletes the copied hook script from ~/.claude-companion/hooks/
- * - Preserves ~/.claude-companion/status.json (user data)
+ * - Deletes the copied hook script from ~/.agent-paperclip/hooks/
+ * - Preserves ~/.agent-paperclip/status.json (user data)
  */
 
 import fs from 'fs'
@@ -15,7 +15,7 @@ import os from 'os'
 import type { HookEntry, ClaudeSettings } from '../shared/types'
 
 const HOME = os.homedir()
-const COMPANION_HOOKS_DIR = path.join(HOME, '.claude-companion', 'hooks')
+const COMPANION_HOOKS_DIR = path.join(HOME, '.agent-paperclip', 'hooks')
 const CLAUDE_DIR = path.join(HOME, '.claude')
 const SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json')
 const HOOK_SCRIPT = path.join(COMPANION_HOOKS_DIR, 'status-reporter.js')
@@ -60,7 +60,7 @@ function removeHooksFromSettings(): void {
 
   let modified = false
 
-  // Remove claude-companion hooks from each event type
+  // Remove agent-paperclip hooks from each event type
   const eventTypes = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'Notification']
   for (const eventName of eventTypes) {
     if (!settings.hooks[eventName]) continue
@@ -68,9 +68,9 @@ function removeHooksFromSettings(): void {
     const hookArray = settings.hooks[eventName] as HookEntry[]
     const originalLength = hookArray.length
     settings.hooks[eventName] = hookArray.filter((h) => {
-      // Remove hooks that reference claude-companion
+      // Remove hooks that reference agent-paperclip (or old claude-companion name)
       const isCompanionHook = h.hooks?.some((hook) =>
-        hook.command?.includes('claude-companion')
+        hook.command?.includes('agent-paperclip') || hook.command?.includes('claude-companion')
       )
       return !isCompanionHook
     })
@@ -92,21 +92,21 @@ function removeHooksFromSettings(): void {
 
   if (modified) {
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2))
-    console.log(`Removed Claude Code Companion hooks from ${SETTINGS_FILE}`)
+    console.log(`Removed Agent Paperclip hooks from ${SETTINGS_FILE}`)
   } else {
-    console.log('No Claude Code Companion hooks found in settings')
+    console.log('No Agent Paperclip hooks found in settings')
   }
 }
 
 function main(): void {
-  console.log('\nRemoving Claude Code Companion hooks...\n')
+  console.log('\nRemoving Agent Paperclip hooks...\n')
 
   try {
     removeHooksFromSettings()
     removeHookScript()
 
-    console.log('\nClaude Code Companion hooks removed.')
-    console.log('Note: ~/.claude-companion/status.json was preserved.\n')
+    console.log('\nAgent Paperclip hooks removed.')
+    console.log('Note: ~/.agent-paperclip/status.json was preserved.\n')
   } catch (err) {
     console.error('Error during uninstall:', (err as Error).message)
     // Don't exit with error - allow uninstall to continue

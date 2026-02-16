@@ -278,7 +278,7 @@ describe('setupHooks', () => {
     // Should preserve existing hooks and add ours
     expect(writtenSettings.hooks.PreToolUse).toHaveLength(2)
     expect(writtenSettings.hooks.PreToolUse[0].hooks[0].command).toBe('other-hook')
-    expect(writtenSettings.hooks.PreToolUse[1].hooks[0].command).toContain('claude-companion')
+    expect(writtenSettings.hooks.PreToolUse[1].hooks[0].command).toContain('agent-paperclip')
   })
 
   it('throws error when hook source file does not exist', async () => {

@@ -1,5 +1,5 @@
 /**
- * Claude Code Companion Setup Module
+ * Agent Paperclip Setup Module
  *
  * Handles hook configuration for Claude Code settings.
  * Extracted for testability.
@@ -12,7 +12,7 @@ import readline from 'readline'
 import type { HookEntry, HooksConfig, ClaudeSettings } from '../shared/types'
 
 const HOME = os.homedir()
-export const COMPANION_DIR = path.join(HOME, '.claude-companion')
+export const COMPANION_DIR = path.join(HOME, '.agent-paperclip')
 export const COMPANION_HOOKS_DIR = path.join(COMPANION_DIR, 'hooks')
 export const CLAUDE_DIR = path.join(HOME, '.claude')
 export const SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json')
@@ -90,9 +90,11 @@ export function mergeHooks(
 
     const hookArray = result.hooks[eventName] as HookEntry[]
 
-    // Check if claude-companion hook already exists
+    // Check if agent-paperclip hook already exists (also match old name for upgrades)
     const existingIndex = hookArray.findIndex((h) =>
-      h.hooks?.some((hook) => hook.command?.includes('claude-companion'))
+      h.hooks?.some((hook) =>
+        hook.command?.includes('agent-paperclip') || hook.command?.includes('claude-companion')
+      )
     )
 
     if (existingIndex >= 0) {

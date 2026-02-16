@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * Claude Code Companion Pre-uninstall Script
+ * Agent Paperclip Pre-uninstall Script
  *
  * Removes Claude Code hooks configuration.
  * - Removes hook entries from ~/.claude/settings.json
- * - Deletes the copied hook script from ~/.claude-companion/hooks/
- * - Preserves ~/.claude-companion/status.json (user data)
+ * - Deletes the copied hook script from ~/.agent-paperclip/hooks/
+ * - Preserves ~/.agent-paperclip/status.json (user data)
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -16,7 +16,7 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const os_1 = __importDefault(require("os"));
 const HOME = os_1.default.homedir();
-const COMPANION_HOOKS_DIR = path_1.default.join(HOME, '.claude-companion', 'hooks');
+const COMPANION_HOOKS_DIR = path_1.default.join(HOME, '.agent-paperclip', 'hooks');
 const CLAUDE_DIR = path_1.default.join(HOME, '.claude');
 const SETTINGS_FILE = path_1.default.join(CLAUDE_DIR, 'settings.json');
 const HOOK_SCRIPT = path_1.default.join(COMPANION_HOOKS_DIR, 'status-reporter.js');
@@ -56,7 +56,7 @@ function removeHooksFromSettings() {
         return;
     }
     let modified = false;
-    // Remove claude-companion hooks from each event type
+    // Remove agent-paperclip hooks from each event type
     const eventTypes = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'Notification'];
     for (const eventName of eventTypes) {
         if (!settings.hooks[eventName])
@@ -64,8 +64,8 @@ function removeHooksFromSettings() {
         const hookArray = settings.hooks[eventName];
         const originalLength = hookArray.length;
         settings.hooks[eventName] = hookArray.filter((h) => {
-            // Remove hooks that reference claude-companion
-            const isCompanionHook = h.hooks?.some((hook) => hook.command?.includes('claude-companion'));
+            // Remove hooks that reference agent-paperclip (or old claude-companion name)
+            const isCompanionHook = h.hooks?.some((hook) => hook.command?.includes('agent-paperclip') || hook.command?.includes('claude-companion'));
             return !isCompanionHook;
         });
         if (settings.hooks[eventName].length < originalLength) {
@@ -82,19 +82,19 @@ function removeHooksFromSettings() {
     }
     if (modified) {
         fs_1.default.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
-        console.log(`Removed Claude Code Companion hooks from ${SETTINGS_FILE}`);
+        console.log(`Removed Agent Paperclip hooks from ${SETTINGS_FILE}`);
     }
     else {
-        console.log('No Claude Code Companion hooks found in settings');
+        console.log('No Agent Paperclip hooks found in settings');
     }
 }
 function main() {
-    console.log('\nRemoving Claude Code Companion hooks...\n');
+    console.log('\nRemoving Agent Paperclip hooks...\n');
     try {
         removeHooksFromSettings();
         removeHookScript();
-        console.log('\nClaude Code Companion hooks removed.');
-        console.log('Note: ~/.claude-companion/status.json was preserved.\n');
+        console.log('\nAgent Paperclip hooks removed.');
+        console.log('Note: ~/.agent-paperclip/status.json was preserved.\n');
     }
     catch (err) {
         console.error('Error during uninstall:', err.message);

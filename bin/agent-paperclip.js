@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * Claude Code Companion CLI
+ * Agent Paperclip CLI
  *
  * Commands:
- *   claude-companion       - Launch the desktop pet app
- *   claude-companion stop  - Stop the running app
- *   claude-companion setup - Configure Claude Code hooks (with confirmation)
+ *   agent-paperclip       - Launch the desktop pet app
+ *   agent-paperclip stop  - Stop the running app
+ *   agent-paperclip setup - Configure Claude Code hooks (with confirmation)
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -23,7 +23,7 @@ const pid_1 = require("../lib/pid");
 const session_finder_1 = require("../codex/session-finder");
 const CODEX_WATCHER_PID_FILE = path_1.default.join(setup_1.COMPANION_DIR, 'codex-watcher.pid');
 async function runSetup() {
-    console.log('\nClaude Code Companion Setup\n');
+    console.log('\nAgent Paperclip Setup\n');
     console.log('This will configure Claude Code hooks to send status updates to the pet.');
     console.log('The following file will be modified:');
     console.log(`  ${setup_1.SETTINGS_FILE}\n`);
@@ -46,7 +46,7 @@ async function runSetup() {
     }
     console.log(`Updated Claude Code settings at ${result.settingsPath}`);
     console.log('\nSetup complete!');
-    console.log('Run "claude-companion" to launch the desktop pet.\n');
+    console.log('Run "agent-paperclip" to launch the desktop pet.\n');
 }
 function isCodexWatcher(pid) {
     try {
@@ -110,7 +110,7 @@ function launchApp() {
     child.unref();
     // Also start the Codex watcher if Codex is installed
     launchCodexWatcher();
-    console.log('Claude Code Companion launched!');
+    console.log('Agent Paperclip launched!');
 }
 function stopApp() {
     if (process.platform === 'win32') {
@@ -123,8 +123,8 @@ function stopApp() {
 }
 function stopAppWindows() {
     try {
-        // Pattern matches both local dev (claude-companion) and npm-installed (claude-code-companion)
-        const pattern = '*companion*out*main*index.js*';
+        // Pattern matches both local dev and npm-installed (agent-paperclip)
+        const pattern = '*agent-paperclip*out*main*index.js*';
         // Use PowerShell to find electron processes (replacement for deprecated wmic)
         const findScript = `Get-CimInstance Win32_Process | ` +
             `Where-Object { $_.Name -eq 'electron.exe' -and $_.CommandLine -like '${pattern}' } | ` +
@@ -133,7 +133,7 @@ function stopAppWindows() {
             encoding: 'utf-8'
         }).trim();
         if (!output) {
-            console.log('Claude Code Companion is not running.');
+            console.log('Agent Paperclip is not running.');
             return;
         }
         // Kill each process with taskkill
@@ -146,22 +146,22 @@ function stopAppWindows() {
                 // Ignore errors - child processes may already be terminated
             }
         }
-        console.log('Claude Code Companion stopped.');
+        console.log('Agent Paperclip stopped.');
     }
     catch {
-        console.log('Claude Code Companion is not running.');
+        console.log('Agent Paperclip is not running.');
     }
 }
 function stopAppUnix() {
     try {
-        // Kill Electron processes running claude-companion
-        // Match the app path argument: .../claude-code-companion/out/main/index.js
-        (0, child_process_1.execSync)('pkill -f "claude-code-companion/out/main"', { stdio: 'ignore' });
-        console.log('Claude Code Companion stopped.');
+        // Kill Electron processes running agent-paperclip
+        // Match the app path argument: .../agent-paperclip/out/main/index.js
+        (0, child_process_1.execSync)('pkill -f "agent-paperclip/out/main"', { stdio: 'ignore' });
+        console.log('Agent Paperclip stopped.');
     }
     catch {
         // pkill returns non-zero if no processes matched
-        console.log('Claude Code Companion is not running.');
+        console.log('Agent Paperclip is not running.');
     }
 }
 const command = process.argv[2];
@@ -176,7 +176,7 @@ async function main() {
         launchApp();
     }
     else {
-        console.log('Usage: claude-companion [command]');
+        console.log('Usage: agent-paperclip [command]');
         console.log('');
         console.log('Commands:');
         console.log('  (none)  Launch the desktop pet');

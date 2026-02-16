@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * Claude Code Companion Status Reporter Hook
+ * Agent Paperclip Status Reporter Hook
  *
  * This script receives events from Claude Code hooks and writes
- * status updates to ~/.claude-companion/status.json
+ * status updates to ~/.agent-paperclip/status.json
  *
  * Hook events received via stdin as JSON:
  * - UserPromptSubmit: When the user submits a prompt
