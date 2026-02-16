@@ -30,16 +30,13 @@ describe('writeStatus', () => {
     vi.clearAllMocks()
   })
 
-  it('writes status to status.json', async () => {
+  it('writes status directly to status.json', async () => {
     await writeStatus('working', 'Editing file...')
 
+    expect(mockWriteFile).toHaveBeenCalledTimes(1)
     expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
+      expect.stringMatching(/status\.json$/),
       expect.stringContaining('"status": "working"')
-    )
-    expect(mockWriteFile).toHaveBeenCalledWith(
-      expect.stringContaining('status.json'),
-      expect.stringContaining('"action": "Editing file..."')
     )
   })
 
@@ -85,5 +82,29 @@ describe('writeStatus', () => {
     const parsed = JSON.parse(written)
     expect(parsed.timestamp).toBeTypeOf('number')
     expect(parsed.timestamp).toBeGreaterThan(0)
+  })
+
+  it('serializes writes in call order', async () => {
+    let releaseFirst = () => {}
+    const firstWritePending = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+
+    mockWriteFile.mockImplementationOnce(() => firstWritePending)
+
+    const first = writeStatus('working', 'First write')
+    const second = writeStatus('thinking', 'Second write')
+
+    await vi.waitFor(() => {
+      expect(mockWriteFile).toHaveBeenCalledTimes(1)
+    })
+    expect(mockWriteFile.mock.calls[0][1]).toContain('First write')
+
+    releaseFirst()
+    await first
+    await second
+
+    expect(mockWriteFile).toHaveBeenCalledTimes(2)
+    expect(mockWriteFile.mock.calls[1][1]).toContain('Second write')
   })
 })

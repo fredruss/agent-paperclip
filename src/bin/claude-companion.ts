@@ -58,8 +58,16 @@ async function runSetup(): Promise<void> {
 
 function isCodexWatcher(pid: number): boolean {
   try {
-    const cmd = execSync(`ps -p ${pid} -o command=`, { encoding: 'utf-8' }).trim()
-    return cmd.includes('codex/watcher')
+    const cmd =
+      process.platform === 'win32'
+        ? execSync(
+            `powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \\"ProcessId = ${pid}\\").CommandLine"`,
+            { encoding: 'utf-8' }
+          ).trim()
+        : execSync(`ps -p ${pid} -o command=`, { encoding: 'utf-8' }).trim()
+
+    const normalized = cmd.replaceAll('\\', '/').toLowerCase()
+    return normalized.includes('codex/watcher.js')
   } catch {
     return false
   }
@@ -204,7 +212,11 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error('Error:', err)
-  process.exit(1)
-})
+const isMain = typeof require !== 'undefined' && require.main === module
+
+if (isMain) {
+  main().catch((err) => {
+    console.error('Error:', err)
+    process.exit(1)
+  })
+}

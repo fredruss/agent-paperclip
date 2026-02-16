@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'events'
 import type { ChildProcess } from 'child_process'
 
@@ -59,15 +59,31 @@ function mockExists({
   })
 }
 
+const originalNodeEnv = process.env.NODE_ENV
+
 beforeEach(() => {
   vi.resetModules()
   vi.clearAllMocks()
+  process.env.NODE_ENV = 'development'
   mockApp.isPackaged = false
   mockGetAppPath.mockReturnValue('/repo/app')
   mockExists({ codexHome: true, watcherScript: true })
 })
 
+afterEach(() => {
+  process.env.NODE_ENV = originalNodeEnv
+})
+
 describe('startDevCodexWatcher', () => {
+  it('does not spawn outside development mode', async () => {
+    process.env.NODE_ENV = 'production'
+    const { startDevCodexWatcher } = await import('./codex-watcher')
+
+    startDevCodexWatcher()
+
+    expect(mockSpawn).not.toHaveBeenCalled()
+  })
+
   it('does not spawn in packaged mode', async () => {
     mockApp.isPackaged = true
     const { startDevCodexWatcher } = await import('./codex-watcher')
@@ -109,7 +125,7 @@ describe('startDevCodexWatcher', () => {
     expect(mockSpawn).toHaveBeenCalledTimes(1)
     expect(mockSpawn).toHaveBeenCalledWith(
       process.execPath,
-      ['/repo/codex/watcher.js'],
+      [expect.stringMatching(/[\\/]codex[\\/]watcher\.js$/)],
       { stdio: 'ignore', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }
     )
   })

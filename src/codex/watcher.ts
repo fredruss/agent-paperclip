@@ -19,10 +19,18 @@ import type { CodexRolloutEntry } from './types'
 import type { TokenUsage } from '../shared/types'
 import type { SessionWatcher } from './session-watcher'
 
+const debug = !!process.env.COMPANION_DEBUG
 let watcher: SessionWatcher | null = null
 let latestUsage: TokenUsage | undefined
 
 function handleEvent(entry: CodexRolloutEntry): void {
+  if (debug) {
+    const subtype = entry.type === 'event_msg' || entry.type === 'response_item'
+      ? ` (${(entry as { payload?: { type?: string } }).payload?.type})`
+      : ''
+    console.error(`[watcher] event: ${entry.type}${subtype}`)
+  }
+
   // A new session starts with session_meta; clear usage from any previous session.
   if (entry.type === 'session_meta') {
     latestUsage = undefined
@@ -36,9 +44,10 @@ function handleEvent(entry: CodexRolloutEntry): void {
   const update = mapCodexEvent(entry)
   if (!update) return
 
+  if (debug) console.error(`[watcher] -> ${update.status}: ${update.action}`)
   writeStatus(update.status, update.action, update.usage ?? latestUsage ?? null)
-    .catch(() => {
-      // Ignore write errors silently
+    .catch((err) => {
+      console.error(`[watcher] writeStatus failed:`, err)
     })
 }
 
@@ -46,20 +55,26 @@ async function startSessionWatching(): Promise<void> {
   const sessionFile = await findLatestSession()
 
   if (sessionFile) {
+    if (debug) console.error(`[watcher] watching session: ${sessionFile}`)
     watcher = await watchSession(sessionFile, handleEvent)
   } else {
+    if (debug) console.error('[watcher] no session found, waiting for first session...')
     watcher = await watchForFirstSession(handleEvent)
   }
 }
 
 async function start(): Promise<void> {
+  if (debug) console.error(`[watcher] starting, SESSIONS_DIR=${SESSIONS_DIR}`)
+
   if (existsSync(SESSIONS_DIR)) {
+    if (debug) console.error('[watcher] sessions dir exists')
     await startSessionWatching()
     return
   }
 
   // Sessions directory doesn't exist yet - watch for it to appear
   if (!existsSync(CODEX_HOME)) {
+    if (debug) console.error('[watcher] no ~/.codex, exiting')
     process.exit(0)
   }
 

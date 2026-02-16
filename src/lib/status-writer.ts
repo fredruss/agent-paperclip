@@ -13,6 +13,7 @@ import type { PetState, TokenUsage, Status } from '../shared/types'
 
 export const STATUS_DIR = join(homedir(), '.claude-companion')
 export const STATUS_FILE = join(STATUS_DIR, 'status.json')
+let writeChain: Promise<void> = Promise.resolve()
 
 export async function ensureStatusDir(): Promise<void> {
   if (!existsSync(STATUS_DIR)) {
@@ -25,14 +26,25 @@ export async function writeStatus(
   action: string,
   usage: TokenUsage | null = null
 ): Promise<void> {
-  await ensureStatusDir()
-  const data: Status = {
-    status,
-    action,
-    timestamp: Date.now()
-  }
-  if (usage) {
-    data.usage = usage
-  }
-  await writeFile(STATUS_FILE, JSON.stringify(data, null, 2))
+  const task = writeChain.then(async () => {
+    await ensureStatusDir()
+
+    const data: Status = {
+      status,
+      action,
+      timestamp: Date.now()
+    }
+    if (usage) {
+      data.usage = usage
+    }
+
+    await writeFile(STATUS_FILE, JSON.stringify(data, null, 2))
+  })
+
+  // Keep queue processing even after a rejected write.
+  writeChain = task.catch(() => {
+    // noop
+  })
+
+  await task
 }

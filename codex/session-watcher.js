@@ -13,6 +13,7 @@ exports.watchForFirstSession = watchForFirstSession;
 const promises_1 = require("fs/promises");
 const chokidar_1 = require("chokidar");
 const session_finder_1 = require("./session-finder");
+const debug = !!process.env.COMPANION_DEBUG;
 /**
  * Parse a chunk of JSONL text while preserving incomplete trailing lines.
  */
@@ -80,8 +81,12 @@ async function watchSession(sessionFile, onEvent) {
                 await fd.read(buf, 0, buf.length, offset);
                 offset = fileStat.size;
                 const newContent = buf.toString('utf8');
+                if (debug)
+                    console.error(`[session-watcher] read ${buf.length} new bytes`);
                 const parsed = parseJsonlChunk(newContent, lineRemainder);
                 lineRemainder = parsed.remainder;
+                if (debug)
+                    console.error(`[session-watcher] parsed ${parsed.entries.length} entries`);
                 for (const entry of parsed.entries) {
                     onEvent(entry);
                 }
@@ -102,8 +107,16 @@ async function watchSession(sessionFile, onEvent) {
         }
     }
     // Watch the current session file for changes
-    const fileWatcher = (0, chokidar_1.watch)(currentFile, { persistent: true });
-    fileWatcher.on('change', () => { readNewContent(); });
+    const usePolling = process.platform === 'win32';
+    const fileWatcher = (0, chokidar_1.watch)(currentFile, {
+        persistent: true,
+        ...(usePolling && { usePolling: true, interval: 500 })
+    });
+    fileWatcher.on('change', () => {
+        if (debug)
+            console.error(`[session-watcher] change detected in ${currentFile}`);
+        readNewContent();
+    });
     // Watch the sessions directory for new session files
     let dirWatcher = null;
     try {

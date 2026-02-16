@@ -13,6 +13,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
+    "dev:debug": "cross-env COMPANION_DEBUG=1 electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "start": "electron .",
@@ -33,6 +34,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.1.2",
+    "cross-env": "^10.1.0",
     "electron": "^40.0.0",
     "electron-builder": "^26.4.0",
     "electron-vite": "^5.0.0",

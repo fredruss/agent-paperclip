@@ -10,6 +10,7 @@ import { startDevCodexWatcher, stopDevCodexWatcher } from './codex-watcher'
 const STATUS_DIR = join(homedir(), '.claude-companion')
 const STATUS_FILE = join(STATUS_DIR, 'status.json')
 const SETTINGS_FILE = join(STATUS_DIR, 'settings.json')
+const debug = !!process.env.COMPANION_DEBUG
 
 let mainWindow: BrowserWindow | null = null
 
@@ -138,18 +139,32 @@ function createWindow(): void {
 }
 
 function setupStatusWatcher(): void {
+  if (debug) console.log(`[status-watcher] watching ${STATUS_FILE}`)
+
+  const usePolling = process.platform === 'win32'
   const watcher = watch(STATUS_FILE, {
     persistent: true,
-    ignoreInitial: false
+    ignoreInitial: false,
+    ...(usePolling && { usePolling: true, interval: 250 })
   })
 
-  watcher.on('add', sendStatus)
-  watcher.on('change', sendStatus)
+  watcher.on('add', () => {
+    if (debug) console.log('[status-watcher] file added')
+    sendStatus()
+  })
+  watcher.on('change', () => {
+    if (debug) console.log('[status-watcher] file changed')
+    sendStatus()
+  })
+  watcher.on('error', (err) => {
+    console.error('[status-watcher] error:', err)
+  })
 }
 
 async function sendStatus(): Promise<void> {
   if (!mainWindow) return
   const status = await readStatus()
+  if (debug) console.log(`[status-watcher] sending: ${status.status} - ${status.action}`)
   mainWindow.webContents.send('status-update', status)
 }
 

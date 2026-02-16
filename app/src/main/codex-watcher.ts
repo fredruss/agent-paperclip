@@ -5,6 +5,7 @@ import { homedir } from 'os'
 import { app } from 'electron'
 
 const CODEX_HOME = join(homedir(), '.codex')
+const debug = !!process.env.COMPANION_DEBUG
 
 let devWatcherProcess: ChildProcess | null = null
 
@@ -17,9 +18,22 @@ function getWatcherPath(): string {
 }
 
 export function startDevCodexWatcher(): void {
-  if (app.isPackaged) return
-  if (isProcessActive(devWatcherProcess)) return
-  if (!existsSync(CODEX_HOME)) return
+  if (process.env.NODE_ENV !== 'development') {
+    if (debug) console.log('[codex-watcher] skipped: not development')
+    return
+  }
+  if (app.isPackaged) {
+    if (debug) console.log('[codex-watcher] skipped: app is packaged')
+    return
+  }
+  if (isProcessActive(devWatcherProcess)) {
+    if (debug) console.log('[codex-watcher] skipped: already running')
+    return
+  }
+  if (!existsSync(CODEX_HOME)) {
+    if (debug) console.log(`[codex-watcher] skipped: ${CODEX_HOME} not found`)
+    return
+  }
 
   const watcherPath = getWatcherPath()
   if (!existsSync(watcherPath)) {
@@ -27,10 +41,18 @@ export function startDevCodexWatcher(): void {
     return
   }
 
+  if (debug) console.log(`[codex-watcher] spawning: ${watcherPath}`)
+
   const child = spawn(process.execPath, [watcherPath], {
-    stdio: 'ignore',
+    stdio: debug ? ['ignore', 'ignore', 'pipe'] : 'ignore',
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
   })
+
+  if (debug) {
+    child.stderr?.on('data', (data: Buffer) => {
+      console.error(`[codex-watcher] ${data.toString().trimEnd()}`)
+    })
+  }
 
   devWatcherProcess = child
 

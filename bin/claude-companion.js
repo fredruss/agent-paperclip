@@ -50,8 +50,11 @@ async function runSetup() {
 }
 function isCodexWatcher(pid) {
     try {
-        const cmd = (0, child_process_1.execSync)(`ps -p ${pid} -o command=`, { encoding: 'utf-8' }).trim();
-        return cmd.includes('codex/watcher');
+        const cmd = process.platform === 'win32'
+            ? (0, child_process_1.execSync)(`powershell -NoProfile -Command "(Get-CimInstance Win32_Process -Filter \\"ProcessId = ${pid}\\").CommandLine"`, { encoding: 'utf-8' }).trim()
+            : (0, child_process_1.execSync)(`ps -p ${pid} -o command=`, { encoding: 'utf-8' }).trim();
+        const normalized = cmd.replaceAll('\\', '/').toLowerCase();
+        return normalized.includes('codex/watcher.js');
     }
     catch {
         return false;
@@ -182,7 +185,10 @@ async function main() {
         process.exit(1);
     }
 }
-main().catch((err) => {
-    console.error('Error:', err);
-    process.exit(1);
-});
+const isMain = typeof require !== 'undefined' && require.main === module;
+if (isMain) {
+    main().catch((err) => {
+        console.error('Error:', err);
+        process.exit(1);
+    });
+}

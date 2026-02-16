@@ -12,6 +12,8 @@ import type { FSWatcher } from 'chokidar'
 import type { CodexRolloutEntry } from './types'
 import { SESSIONS_DIR } from './session-finder'
 
+const debug = !!process.env.COMPANION_DEBUG
+
 export type EventCallback = (entry: CodexRolloutEntry) => void
 
 export interface SessionWatcher {
@@ -96,9 +98,11 @@ export async function watchSession(
         offset = fileStat.size
 
         const newContent = buf.toString('utf8')
+        if (debug) console.error(`[session-watcher] read ${buf.length} new bytes`)
         const parsed = parseJsonlChunk(newContent, lineRemainder)
         lineRemainder = parsed.remainder
 
+        if (debug) console.error(`[session-watcher] parsed ${parsed.entries.length} entries`)
         for (const entry of parsed.entries) {
           onEvent(entry)
         }
@@ -117,8 +121,15 @@ export async function watchSession(
   }
 
   // Watch the current session file for changes
-  const fileWatcher = watch(currentFile, { persistent: true })
-  fileWatcher.on('change', () => { readNewContent() })
+  const usePolling = process.platform === 'win32'
+  const fileWatcher = watch(currentFile, {
+    persistent: true,
+    ...(usePolling && { usePolling: true, interval: 500 })
+  })
+  fileWatcher.on('change', () => {
+    if (debug) console.error(`[session-watcher] change detected in ${currentFile}`)
+    readNewContent()
+  })
 
   // Watch the sessions directory for new session files
   let dirWatcher: FSWatcher | null = null
