@@ -242,6 +242,7 @@ describe('runSetupSync', () => {
   it('copies hook and creates settings when no existing settings', () => {
     mockFs.existsSync.mockImplementation((path: string) => {
       if (path === '/source/hook.js') return true
+      if (path.includes('lib/status-writer.js')) return true
       return false
     })
 
@@ -256,6 +257,30 @@ describe('runSetupSync', () => {
     expect(result.backupPath).toBeUndefined()
     expect(mockFs.copyFileSync).toHaveBeenCalled()
     expect(mockFs.writeFileSync).toHaveBeenCalled()
+  })
+
+  it('copies lib/status-writer.js alongside the hook script', () => {
+    mockFs.existsSync.mockImplementation((path: string) => {
+      if (path === '/source/hooks/status-reporter.js') return true
+      if (path.includes('lib/status-writer.js')) return true
+      return false
+    })
+
+    runSetupSync({
+      hookSourcePath: '/source/hooks/status-reporter.js',
+      hookDestPath: '/dest/hooks/status-reporter.js',
+      settingsPath: '/path/to/settings.json'
+    })
+
+    // Should copy both the hook script and the lib file
+    expect(mockFs.copyFileSync).toHaveBeenCalledWith(
+      '/source/hooks/status-reporter.js',
+      '/dest/hooks/status-reporter.js'
+    )
+    expect(mockFs.copyFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('lib/status-writer.js'),
+      expect.stringContaining('lib/status-writer.js')
+    )
   })
 
   it('creates backup when settings exist', () => {

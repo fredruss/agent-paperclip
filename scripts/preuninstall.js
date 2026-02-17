@@ -16,10 +16,13 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const os_1 = __importDefault(require("os"));
 const HOME = os_1.default.homedir();
-const COMPANION_HOOKS_DIR = path_1.default.join(HOME, '.agent-paperclip', 'hooks');
+const COMPANION_DIR = path_1.default.join(HOME, '.agent-paperclip');
+const COMPANION_HOOKS_DIR = path_1.default.join(COMPANION_DIR, 'hooks');
+const COMPANION_LIB_DIR = path_1.default.join(COMPANION_DIR, 'lib');
 const CLAUDE_DIR = path_1.default.join(HOME, '.claude');
 const SETTINGS_FILE = path_1.default.join(CLAUDE_DIR, 'settings.json');
 const HOOK_SCRIPT = path_1.default.join(COMPANION_HOOKS_DIR, 'status-reporter.js');
+const LIB_STATUS_WRITER = path_1.default.join(COMPANION_LIB_DIR, 'status-writer.js');
 function removeHookScript() {
     if (fs_1.default.existsSync(HOOK_SCRIPT)) {
         fs_1.default.unlinkSync(HOOK_SCRIPT);
@@ -30,6 +33,23 @@ function removeHookScript() {
             if (files.length === 0) {
                 fs_1.default.rmdirSync(COMPANION_HOOKS_DIR);
                 console.log(`Removed empty directory: ${COMPANION_HOOKS_DIR}`);
+            }
+        }
+        catch {
+            // Directory not empty or doesn't exist, that's fine
+        }
+    }
+}
+function removeLibFiles() {
+    if (fs_1.default.existsSync(LIB_STATUS_WRITER)) {
+        fs_1.default.unlinkSync(LIB_STATUS_WRITER);
+        console.log(`Removed lib file: ${LIB_STATUS_WRITER}`);
+        // Try to remove lib directory if empty
+        try {
+            const files = fs_1.default.readdirSync(COMPANION_LIB_DIR);
+            if (files.length === 0) {
+                fs_1.default.rmdirSync(COMPANION_LIB_DIR);
+                console.log(`Removed empty directory: ${COMPANION_LIB_DIR}`);
             }
         }
         catch {
@@ -93,6 +113,7 @@ function main() {
     try {
         removeHooksFromSettings();
         removeHookScript();
+        removeLibFiles();
         console.log('\nAgent Paperclip hooks removed.');
         console.log('Note: ~/.agent-paperclip/status.json was preserved.\n');
     }

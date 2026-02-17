@@ -145,6 +145,19 @@ export function runSetupSync(deps?: SetupDeps): SetupResult {
   // Copy hook script
   copyHookScript(sourcePath, destPath, deps)
 
+  // Copy lib/status-writer.js (required by the hook script)
+  const libSourcePath = path.join(path.dirname(sourcePath), '..', 'lib', 'status-writer.js')
+  if (!fsModule.existsSync(libSourcePath)) {
+    return {
+      success: false,
+      error: `Lib source not found: ${libSourcePath}`
+    }
+  }
+  const libDestDir = path.join(COMPANION_DIR, 'lib')
+  const libDestPath = path.join(libDestDir, 'status-writer.js')
+  ensureDir(libDestDir, deps)
+  fsModule.copyFileSync(libSourcePath, libDestPath)
+
   // Read existing settings
   let settings: ClaudeSettings = {}
   let backupPath: string | undefined

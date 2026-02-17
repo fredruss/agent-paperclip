@@ -15,10 +15,13 @@ import os from 'os'
 import type { HookEntry, ClaudeSettings } from '../shared/types'
 
 const HOME = os.homedir()
-const COMPANION_HOOKS_DIR = path.join(HOME, '.agent-paperclip', 'hooks')
+const COMPANION_DIR = path.join(HOME, '.agent-paperclip')
+const COMPANION_HOOKS_DIR = path.join(COMPANION_DIR, 'hooks')
+const COMPANION_LIB_DIR = path.join(COMPANION_DIR, 'lib')
 const CLAUDE_DIR = path.join(HOME, '.claude')
 const SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json')
 const HOOK_SCRIPT = path.join(COMPANION_HOOKS_DIR, 'status-reporter.js')
+const LIB_STATUS_WRITER = path.join(COMPANION_LIB_DIR, 'status-writer.js')
 
 function removeHookScript(): void {
   if (fs.existsSync(HOOK_SCRIPT)) {
@@ -31,6 +34,24 @@ function removeHookScript(): void {
       if (files.length === 0) {
         fs.rmdirSync(COMPANION_HOOKS_DIR)
         console.log(`Removed empty directory: ${COMPANION_HOOKS_DIR}`)
+      }
+    } catch {
+      // Directory not empty or doesn't exist, that's fine
+    }
+  }
+}
+
+function removeLibFiles(): void {
+  if (fs.existsSync(LIB_STATUS_WRITER)) {
+    fs.unlinkSync(LIB_STATUS_WRITER)
+    console.log(`Removed lib file: ${LIB_STATUS_WRITER}`)
+
+    // Try to remove lib directory if empty
+    try {
+      const files = fs.readdirSync(COMPANION_LIB_DIR)
+      if (files.length === 0) {
+        fs.rmdirSync(COMPANION_LIB_DIR)
+        console.log(`Removed empty directory: ${COMPANION_LIB_DIR}`)
       }
     } catch {
       // Directory not empty or doesn't exist, that's fine
@@ -104,6 +125,7 @@ function main(): void {
   try {
     removeHooksFromSettings()
     removeHookScript()
+    removeLibFiles()
 
     console.log('\nAgent Paperclip hooks removed.')
     console.log('Note: ~/.agent-paperclip/status.json was preserved.\n')

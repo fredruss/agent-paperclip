@@ -27,7 +27,7 @@ vi.mock('fs/promises', () => ({
 }))
 
 // Now import the module under test
-const { isHookConfigured, setupHooks, createHookConfig, COMPANION_HOOKS_DIR, CLAUDE_SETTINGS_FILE } =
+const { isHookConfigured, setupHooks, createHookConfig, COMPANION_HOOKS_DIR, CLAUDE_SETTINGS_FILE, STATUS_DIR } =
   await import('./hooks-setup')
 
 describe('createHookConfig', () => {
@@ -296,5 +296,42 @@ describe('setupHooks', () => {
 
     // Should not have written settings since source was missing
     expect(mockWriteFile).not.toHaveBeenCalled()
+  })
+
+  it('copies lib/status-writer.js alongside the hook script', async () => {
+    const { join } = await import('path')
+
+    mockExistsSync.mockImplementation((path: string) => {
+      // Hook script not installed yet (triggers setup)
+      if (path.includes('status-reporter.js') && path.includes(COMPANION_HOOKS_DIR)) {
+        return false
+      }
+      // Source hook file exists
+      if (path === '/source/hooks/status-reporter.js') {
+        return true
+      }
+      // Lib source file exists
+      if (path.includes('lib/status-writer.js')) {
+        return true
+      }
+      return false
+    })
+
+    mockGetHookSourcePath.mockReturnValue('/source/hooks/status-reporter.js')
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+
+    await setupHooks({ getHookSourcePath: mockGetHookSourcePath })
+
+    // Should copy lib/status-writer.js
+    expect(mockCopyFile).toHaveBeenCalledWith(
+      expect.stringContaining('lib/status-writer.js'),
+      join(STATUS_DIR, 'lib', 'status-writer.js')
+    )
+
+    // Should create the lib directory
+    expect(mockMkdir).toHaveBeenCalledWith(
+      join(STATUS_DIR, 'lib'),
+      { recursive: true }
+    )
   })
 })

@@ -1,6 +1,6 @@
 import { readFile, mkdir, writeFile, copyFile } from 'fs/promises'
 import { existsSync } from 'fs'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { homedir } from 'os'
 
 export const STATUS_DIR = join(homedir(), '.agent-paperclip')
@@ -69,6 +69,19 @@ export async function setupHooks(options: SetupHooksOptions): Promise<void> {
 
   await copyFile(sourcePath, destPath)
   console.log('Copied hook script to', destPath)
+
+  // Copy lib/status-writer.js (required by the hook script)
+  const libSourcePath = join(dirname(sourcePath), '..', 'lib', 'status-writer.js')
+  if (!existsSync(libSourcePath)) {
+    console.error('Lib source not found:', libSourcePath)
+    return
+  }
+  const libDestDir = join(STATUS_DIR, 'lib')
+  if (!existsSync(libDestDir)) {
+    await mkdir(libDestDir, { recursive: true })
+  }
+  await copyFile(libSourcePath, join(libDestDir, 'status-writer.js'))
+  console.log('Copied lib/status-writer.js to', libDestDir)
 
   // Read existing Claude settings or create new
   let claudeSettings: Record<string, unknown> = {}

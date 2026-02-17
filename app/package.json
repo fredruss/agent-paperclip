@@ -1,6 +1,6 @@
 {
   "name": "agent-paperclip-dev",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "private": true,
   "description": "Desktop pet that shows your AI coding agent's real-time status (development)",
