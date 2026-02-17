@@ -1,6 +1,6 @@
 # Agent Paperclip
 
-<img src="app/resources/agent-paperclip-screenshot.png" width="128" alt="Agent Paperclip icon">
+<img src="app/resources/icon.png" width="128" alt="Agent Paperclip icon">
 
 A desktop companion that lets you monitor your AI coding agent. See when the agent is done, when it needs input, and how much context has been used without having to stare at your terminal. Also, it's cute.
 
