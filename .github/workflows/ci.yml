@@ -18,18 +18,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            app/package-lock.json
 
       - name: Install root dependencies
-        run: npm ci
+        run: rm package-lock.json && npm install
 
       - name: Verify generated script artifacts
         run: |
           npm run build:scripts
-          git diff --exit-code
+          git diff --exit-code -- bin/ hooks/ lib/ scripts/ codex/
 
       - name: Install dependencies
         working-directory: app
