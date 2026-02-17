@@ -1,6 +1,6 @@
 {
   "name": "agent-paperclip",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "Desktop pet that shows your AI coding agent's real-time status",
   "bin": {
     "agent-paperclip": "./bin/agent-paperclip.js"
