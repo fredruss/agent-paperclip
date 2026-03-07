@@ -14,6 +14,7 @@ const promises_1 = require("fs/promises");
 const chokidar_1 = require("chokidar");
 const session_finder_1 = require("./session-finder");
 const debug = !!process.env.COMPANION_DEBUG;
+const MAX_CHUNK_BYTES = 5 * 1024 * 1024; // 5 MB
 /**
  * Parse a chunk of JSONL text while preserving incomplete trailing lines.
  */
@@ -76,11 +77,13 @@ async function watchSession(sessionFile, onEvent) {
             const fileStat = await (0, promises_1.stat)(filePath);
             if (fileStat.size <= state.offset)
                 return;
+            const bytesToRead = Math.min(fileStat.size - state.offset, MAX_CHUNK_BYTES);
             const fd = await (0, promises_1.open)(filePath, 'r');
             try {
-                const buf = Buffer.alloc(fileStat.size - state.offset);
+                const buf = Buffer.alloc(bytesToRead);
                 await fd.read(buf, 0, buf.length, state.offset);
-                state.offset = fileStat.size;
+                state.offset += bytesToRead;
+                state.dirty = state.offset < fileStat.size;
                 const newContent = buf.toString('utf8');
                 if (debug)
                     console.error(`[session-watcher] read ${buf.length} new bytes from ${filePath}`);
