@@ -75,3 +75,18 @@ export interface ClaudeSettings {
   hooks?: HooksConfig
   [key: string]: unknown
 }
+
+// Multi-session types
+export type SessionSource = 'claude-code' | 'codex'
+
+export interface SessionStatus extends Status {
+  sessionId: string
+  source: SessionSource
+  lastActivity: number
+}
+
+export type SessionMap = Record<string, SessionStatus>
+
+export interface SessionsFile {
+  sessions: SessionMap
+}

@@ -9,6 +9,7 @@
  * Launched automatically by `agent-paperclip` when ~/.codex/ exists.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.createEventHandler = createEventHandler;
 const fs_1 = require("fs");
 const chokidar_1 = require("chokidar");
 const status_writer_1 = require("../lib/status-writer");
@@ -17,33 +18,51 @@ const session_watcher_1 = require("./session-watcher");
 const event_mapper_1 = require("./event-mapper");
 const debug = !!process.env.COMPANION_DEBUG;
 let watcher = null;
-let latestUsage;
-function handleEvent(entry) {
-    if (debug) {
-        const subtype = entry.type === 'event_msg' || entry.type === 'response_item'
-            ? ` (${entry.payload?.type})`
-            : '';
-        console.error(`[watcher] event: ${entry.type}${subtype}`);
-    }
-    // A new session starts with session_meta; clear usage from any previous session.
-    if (entry.type === 'session_meta') {
-        latestUsage = undefined;
-    }
-    // Track usage from token_count events
-    const usage = (0, event_mapper_1.extractUsageFromEntry)(entry);
-    if (usage)
-        latestUsage = usage;
-    // Map to pet state
-    const update = (0, event_mapper_1.mapCodexEvent)(entry);
-    if (!update)
-        return;
-    if (debug)
-        console.error(`[watcher] -> ${update.status}: ${update.action}`);
-    (0, status_writer_1.writeStatus)(update.status, update.action, update.usage ?? latestUsage ?? null)
-        .catch((err) => {
-        console.error(`[watcher] writeStatus failed:`, err);
-    });
+function createEventHandler() {
+    const usageBySession = new Map();
+    return function handleEvent(entry, sessionFile) {
+        const sessionId = (0, status_writer_1.sessionIdFromPath)(sessionFile);
+        if (debug) {
+            const subtype = entry.type === 'event_msg' || entry.type === 'response_item'
+                ? ` (${entry.payload?.type})`
+                : '';
+            console.error(`[watcher] event: ${entry.type}${subtype} (session=${sessionId})`);
+        }
+        // A new session starts with session_meta; clear usage for this session.
+        if (entry.type === 'session_meta') {
+            usageBySession.delete(sessionId);
+        }
+        // Track usage from token_count events
+        const usage = (0, event_mapper_1.extractUsageFromEntry)(entry);
+        if (usage)
+            usageBySession.set(sessionId, usage);
+        // Map to pet state
+        const update = (0, event_mapper_1.mapCodexEvent)(entry);
+        if (!update)
+            return;
+        const sessionUsage = update.usage ?? usageBySession.get(sessionId);
+        if (debug)
+            console.error(`[watcher] -> ${update.status}: ${update.action}`);
+        // Write to sessions.json for multi-session support
+        (0, status_writer_1.writeSessionStatus)(sessionId, 'codex', update.status, update.action, sessionUsage)
+            .catch((err) => {
+            console.error(`[watcher] writeSessionStatus failed:`, err);
+        });
+        // Also write legacy status.json for backward compat
+        (0, status_writer_1.writeStatus)(update.status, update.action, sessionUsage ?? null)
+            .catch((err) => {
+            console.error(`[watcher] writeStatus failed:`, err);
+        });
+        // Clean up session on task_complete
+        if (entry.type === 'event_msg' && entry.payload.type === 'task_complete') {
+            usageBySession.delete(sessionId);
+            (0, status_writer_1.removeSession)(sessionId).catch((err) => {
+                console.error(`[watcher] removeSession failed:`, err);
+            });
+        }
+    };
 }
+const handleEvent = createEventHandler();
 async function startSessionWatching() {
     const sessionFile = await (0, session_finder_1.findLatestSession)();
     if (sessionFile) {

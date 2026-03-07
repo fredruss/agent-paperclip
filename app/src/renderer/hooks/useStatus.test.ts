@@ -1,18 +1,27 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useStatus } from './useStatus'
-import type { ElectronAPI, Status, StatusCallback } from '../../shared/types'
+import type { ElectronAPI, MultiSessionStatus, MultiSessionCallback } from '../../shared/types'
+
+function makeMultiStatus(overrides: Partial<MultiSessionStatus> = {}): MultiSessionStatus {
+  return {
+    primary: { status: 'idle', action: 'Waiting for Agent...', timestamp: Date.now() },
+    sessions: [],
+    sessionCount: 0,
+    ...overrides
+  }
+}
 
 describe('useStatus', () => {
   let mockGetStatus: ReturnType<typeof vi.fn>
   let mockOnStatusUpdate: ReturnType<typeof vi.fn>
   let mockUnsubscribe: ReturnType<typeof vi.fn>
-  let statusCallback: StatusCallback | null = null
+  let statusCallback: MultiSessionCallback | null = null
 
   beforeEach(() => {
     mockGetStatus = vi.fn()
     mockUnsubscribe = vi.fn()
-    mockOnStatusUpdate = vi.fn((callback: StatusCallback) => {
+    mockOnStatusUpdate = vi.fn((callback: MultiSessionCallback) => {
       statusCallback = callback
       return mockUnsubscribe
     })
@@ -38,31 +47,27 @@ describe('useStatus', () => {
   })
 
   it('fetches initial status on mount', async () => {
-    const initialStatus: Status = {
-      status: 'working',
-      action: 'Working...',
-      timestamp: Date.now()
-    }
+    const initialStatus = makeMultiStatus({
+      primary: { status: 'working', action: 'Working...', timestamp: Date.now() },
+      sessionCount: 1,
+      sessions: [{ sessionId: 's1', source: 'claude-code', status: 'working', action: 'Working...' }]
+    })
     mockGetStatus.mockResolvedValue(initialStatus)
 
     const { result } = renderHook(() => useStatus())
 
-    // Wait for the promise to resolve
     await act(async () => {
       await mockGetStatus.mock.results[0]?.value
     })
 
     expect(mockGetStatus).toHaveBeenCalledTimes(1)
-    expect(result.current.status).toBe('working')
-    expect(result.current.action).toBe('Working...')
+    expect(result.current.primary.status).toBe('working')
+    expect(result.current.primary.action).toBe('Working...')
+    expect(result.current.sessionCount).toBe(1)
   })
 
   it('updates status when IPC callback fires', async () => {
-    mockGetStatus.mockResolvedValue({
-      status: 'idle',
-      action: 'Waiting...',
-      timestamp: Date.now()
-    })
+    mockGetStatus.mockResolvedValue(makeMultiStatus())
 
     const { result } = renderHook(() => useStatus())
 
@@ -72,54 +77,47 @@ describe('useStatus', () => {
 
     expect(mockOnStatusUpdate).toHaveBeenCalled()
 
-    const newStatus: Status = {
-      status: 'reading',
-      action: 'Reading file...',
-      timestamp: Date.now()
-    }
+    const newStatus = makeMultiStatus({
+      primary: { status: 'reading', action: 'Reading file...', timestamp: Date.now() },
+      sessionCount: 1,
+      sessions: [{ sessionId: 's1', source: 'claude-code', status: 'reading', action: 'Reading file...' }]
+    })
 
     act(() => {
       statusCallback?.(newStatus)
     })
 
-    expect(result.current.status).toBe('reading')
-    expect(result.current.action).toBe('Reading file...')
+    expect(result.current.primary.status).toBe('reading')
+    expect(result.current.primary.action).toBe('Reading file...')
   })
 
   it('transitions from done to idle after 4000ms', async () => {
     vi.useFakeTimers()
 
-    mockGetStatus.mockResolvedValue({
-      status: 'idle',
-      action: 'Waiting...',
-      timestamp: Date.now()
-    })
+    mockGetStatus.mockResolvedValue(makeMultiStatus())
 
     const { result } = renderHook(() => useStatus())
 
-    // Manually resolve the promise since we're using fake timers
     await act(async () => {
       await vi.runAllTimersAsync()
     })
 
-    const doneStatus: Status = {
-      status: 'done',
-      action: 'All done!',
-      timestamp: Date.now()
-    }
+    const doneStatus = makeMultiStatus({
+      primary: { status: 'done', action: 'All done!', timestamp: Date.now() }
+    })
 
     act(() => {
       statusCallback?.(doneStatus)
     })
 
-    expect(result.current.status).toBe('done')
+    expect(result.current.primary.status).toBe('done')
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4000)
     })
 
-    expect(result.current.status).toBe('idle')
-    expect(result.current.action).toBe('Waiting for Agent...')
+    expect(result.current.primary.status).toBe('idle')
+    expect(result.current.primary.action).toBe('Waiting for Agent...')
 
     vi.useRealTimers()
   })
@@ -130,17 +128,13 @@ describe('useStatus', () => {
 
     const { result } = renderHook(() => useStatus())
 
-    // Should use default status
-    expect(result.current.status).toBe('idle')
-    expect(result.current.action).toBe('Waiting for Agent...')
+    expect(result.current.primary.status).toBe('idle')
+    expect(result.current.primary.action).toBe('Waiting for Agent...')
+    expect(result.current.sessionCount).toBe(0)
   })
 
   it('cleans up subscriptions on unmount', async () => {
-    mockGetStatus.mockResolvedValue({
-      status: 'idle',
-      action: 'Waiting...',
-      timestamp: Date.now()
-    })
+    mockGetStatus.mockResolvedValue(makeMultiStatus())
 
     const { unmount } = renderHook(() => useStatus())
 
@@ -159,11 +153,7 @@ describe('useStatus', () => {
     vi.useFakeTimers()
     const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout')
 
-    mockGetStatus.mockResolvedValue({
-      status: 'idle',
-      action: 'Waiting...',
-      timestamp: Date.now()
-    })
+    mockGetStatus.mockResolvedValue(makeMultiStatus())
 
     const { unmount } = renderHook(() => useStatus())
 
@@ -171,12 +161,9 @@ describe('useStatus', () => {
       await vi.runAllTimersAsync()
     })
 
-    // Trigger done state to start idle timeout
-    const doneStatus: Status = {
-      status: 'done',
-      action: 'All done!',
-      timestamp: Date.now()
-    }
+    const doneStatus = makeMultiStatus({
+      primary: { status: 'done', action: 'All done!', timestamp: Date.now() }
+    })
 
     act(() => {
       statusCallback?.(doneStatus)
@@ -193,11 +180,7 @@ describe('useStatus', () => {
     vi.useFakeTimers()
     const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout')
 
-    mockGetStatus.mockResolvedValue({
-      status: 'idle',
-      action: 'Waiting...',
-      timestamp: Date.now()
-    })
+    mockGetStatus.mockResolvedValue(makeMultiStatus())
 
     const { result } = renderHook(() => useStatus())
 
@@ -205,41 +188,32 @@ describe('useStatus', () => {
       await vi.runAllTimersAsync()
     })
 
-    // Set to done
     act(() => {
-      statusCallback?.({
-        status: 'done',
-        action: 'All done!',
-        timestamp: Date.now()
-      })
+      statusCallback?.(makeMultiStatus({
+        primary: { status: 'done', action: 'All done!', timestamp: Date.now() }
+      }))
     })
 
-    expect(result.current.status).toBe('done')
+    expect(result.current.primary.status).toBe('done')
 
-    // Advance time partially
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000)
     })
 
-    // Change to working before idle timeout fires
     act(() => {
-      statusCallback?.({
-        status: 'working',
-        action: 'Working...',
-        timestamp: Date.now()
-      })
+      statusCallback?.(makeMultiStatus({
+        primary: { status: 'working', action: 'Working...', timestamp: Date.now() }
+      }))
     })
 
     expect(clearTimeoutSpy).toHaveBeenCalled()
-    expect(result.current.status).toBe('working')
+    expect(result.current.primary.status).toBe('working')
 
-    // Advance time past when idle would have triggered
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3000)
     })
 
-    // Should still be working, not transitioned to idle
-    expect(result.current.status).toBe('working')
+    expect(result.current.primary.status).toBe('working')
 
     vi.useRealTimers()
   })
@@ -257,21 +231,27 @@ describe('useStatus', () => {
       }
     })
 
-    // Should still have default status
-    expect(result.current.status).toBe('idle')
-    expect(result.current.action).toBe('Waiting for Agent...')
+    expect(result.current.primary.status).toBe('idle')
+    expect(result.current.primary.action).toBe('Waiting for Agent...')
   })
 
   it('includes usage data when present', async () => {
-    const statusWithUsage: Status = {
-      status: 'working',
-      action: 'Working...',
-      timestamp: Date.now(),
-      usage: {
-        context: 1000,
-        output: 500
-      }
-    }
+    const statusWithUsage = makeMultiStatus({
+      primary: {
+        status: 'working',
+        action: 'Working...',
+        timestamp: Date.now(),
+        usage: { context: 1000, output: 500 }
+      },
+      sessions: [{
+        sessionId: 's1',
+        source: 'claude-code',
+        status: 'working',
+        action: 'Working...',
+        usage: { context: 1000, output: 500 }
+      }],
+      sessionCount: 1
+    })
     mockGetStatus.mockResolvedValue(statusWithUsage)
 
     const { result } = renderHook(() => useStatus())
@@ -280,7 +260,7 @@ describe('useStatus', () => {
       await mockGetStatus.mock.results[0]?.value
     })
 
-    expect(result.current.usage).toEqual({
+    expect(result.current.primary.usage).toEqual({
       context: 1000,
       output: 500
     })

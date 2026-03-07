@@ -1,18 +1,22 @@
 import { useState, useEffect, useRef } from 'react'
-import type { Status } from '../../shared/types'
+import type { MultiSessionStatus } from '../../shared/types'
 
-export type { Status }
+export type { MultiSessionStatus }
 
-const defaultStatus: Status = {
-  status: 'idle',
-  action: 'Waiting for Agent...',
-  timestamp: Date.now()
+const defaultStatus: MultiSessionStatus = {
+  primary: {
+    status: 'idle',
+    action: 'Waiting for Agent...',
+    timestamp: Date.now()
+  },
+  sessions: [],
+  sessionCount: 0
 }
 
 const IDLE_TIMEOUT_MS = 4000
 
-export function useStatus(): Status {
-  const [status, setStatus] = useState<Status>(defaultStatus)
+export function useStatus(): MultiSessionStatus {
+  const [status, setStatus] = useState<MultiSessionStatus>(defaultStatus)
   const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -38,13 +42,16 @@ export function useStatus(): Status {
       idleTimeoutRef.current = null
     }
 
-    if (status.status === 'done') {
+    if (status.primary.status === 'done') {
       idleTimeoutRef.current = setTimeout(() => {
-        setStatus({
-          status: 'idle',
-          action: 'Waiting for Agent...',
-          timestamp: Date.now()
-        })
+        setStatus((prev) => ({
+          ...prev,
+          primary: {
+            status: 'idle',
+            action: 'Waiting for Agent...',
+            timestamp: Date.now()
+          }
+        }))
       }, IDLE_TIMEOUT_MS)
     }
 
@@ -53,7 +60,7 @@ export function useStatus(): Status {
         clearTimeout(idleTimeoutRef.current)
       }
     }
-  }, [status.status])
+  }, [status.primary.status])
 
   return status
 }

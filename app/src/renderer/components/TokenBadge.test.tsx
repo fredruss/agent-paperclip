@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { TokenBadge, formatTokens } from './TokenBadge'
-import type { TokenUsage } from '../../shared/types'
+import type { SessionInfo } from '../../shared/types'
+
+function makeSession(overrides: Partial<SessionInfo> = {}): SessionInfo {
+  return {
+    sessionId: 's1',
+    source: 'claude-code',
+    status: 'working',
+    action: 'Working...',
+    ...overrides
+  }
+}
 
 describe('formatTokens', () => {
   it('returns raw number for values under 1000', () => {
@@ -33,81 +43,86 @@ describe('TokenBadge', () => {
     vi.useRealTimers()
   })
 
-  it('returns null when usage is undefined', () => {
-    const { container } = render(<TokenBadge usage={undefined} status="working" />)
+  it('returns null when sessions have no usage', () => {
+    const { container } = render(<TokenBadge sessions={[makeSession()]} status="working" />)
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders token count when usage is provided and status is not idle', () => {
-    const usage: TokenUsage = { context: 1500, output: 500 }
-    render(<TokenBadge usage={usage} status="working" />)
+  it('returns null when sessions is empty', () => {
+    const { container } = render(<TokenBadge sessions={[]} status="working" />)
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('renders token count for single session with usage', () => {
+    const sessions = [makeSession({ usage: { context: 1500, output: 500 } })]
+    render(<TokenBadge sessions={sessions} status="working" />)
     expect(screen.getByText('1.5k')).toBeTruthy()
   })
 
   it('renders formatted token count for large values', () => {
-    const usage: TokenUsage = { context: 1500000, output: 500 }
-    render(<TokenBadge usage={usage} status="working" />)
+    const sessions = [makeSession({ usage: { context: 1500000, output: 500 } })]
+    render(<TokenBadge sessions={sessions} status="working" />)
     expect(screen.getByText('1.5M')).toBeTruthy()
   })
 
-  it('handles legacy format with input and cacheRead', () => {
-    // Legacy format uses input/cacheRead instead of context
-    const legacyUsage = { input: 500, cacheRead: 500, output: 100 } as unknown as TokenUsage
-    render(<TokenBadge usage={legacyUsage} status="working" />)
-    expect(screen.getByText('1.0k')).toBeTruthy()
+  it('renders multiple sessions separated by middle dot', () => {
+    const sessions = [
+      makeSession({ sessionId: 's1', usage: { context: 1000, output: 100 } }),
+      makeSession({ sessionId: 's2', usage: { context: 2000, output: 200 } })
+    ]
+    const { container } = render(<TokenBadge sessions={sessions} status="working" />)
+    const badge = container.querySelector('.token-badge')
+    expect(badge?.textContent).toContain('1.0k')
+    expect(badge?.textContent).toContain('\u00b7')
+    expect(badge?.textContent).toContain('2.0k')
   })
 
-  it('prefers context field over legacy format', () => {
-    // If context is present, it should be used
-    const usage: TokenUsage = { context: 2000, output: 100 }
-    render(<TokenBadge usage={usage} status="working" />)
-    expect(screen.getByText('2.0k')).toBeTruthy()
+  it('shows overflow count for more than 3 sessions', () => {
+    const sessions = [
+      makeSession({ sessionId: 's1', usage: { context: 1000, output: 100 } }),
+      makeSession({ sessionId: 's2', usage: { context: 2000, output: 200 } }),
+      makeSession({ sessionId: 's3', usage: { context: 3000, output: 300 } }),
+      makeSession({ sessionId: 's4', usage: { context: 4000, output: 400 } })
+    ]
+    const { container } = render(<TokenBadge sessions={sessions} status="working" />)
+    expect(container.textContent).toContain('+1')
   })
 
   it('hides badge after delay when status is idle', async () => {
-    const usage: TokenUsage = { context: 1500, output: 500 }
-    const { container, rerender } = render(<TokenBadge usage={usage} status="working" />)
+    const sessions = [makeSession({ usage: { context: 1500, output: 500 } })]
+    const { container, rerender } = render(<TokenBadge sessions={sessions} status="working" />)
 
     expect(screen.getByText('1.5k')).toBeTruthy()
 
-    // Rerender with idle status
-    rerender(<TokenBadge usage={usage} status="idle" />)
+    rerender(<TokenBadge sessions={sessions} status="idle" />)
 
-    // Should still be visible initially
     expect(screen.getByText('1.5k')).toBeTruthy()
 
-    // Advance time to trigger auto-hide (10 seconds)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10000)
     })
 
-    // Should be hidden now
     expect(container.querySelector('.token-badge')).toBeNull()
   })
 
   it('stays visible when status changes back to non-idle', async () => {
-    const usage: TokenUsage = { context: 1500, output: 500 }
-    const { rerender } = render(<TokenBadge usage={usage} status="working" />)
+    const sessions = [makeSession({ usage: { context: 1500, output: 500 } })]
+    const { rerender } = render(<TokenBadge sessions={sessions} status="working" />)
 
     expect(screen.getByText('1.5k')).toBeTruthy()
 
-    // Switch to idle
-    rerender(<TokenBadge usage={usage} status="idle" />)
+    rerender(<TokenBadge sessions={sessions} status="idle" />)
 
-    // Advance time partially
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000)
     })
 
-    // Switch back to working
-    rerender(<TokenBadge usage={usage} status="working" />)
+    rerender(<TokenBadge sessions={sessions} status="working" />)
 
-    // Advance time past the original hide delay
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10000)
     })
 
-    // Should still be visible
     expect(screen.getByText('1.5k')).toBeTruthy()
   })
 })

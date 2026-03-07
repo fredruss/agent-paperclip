@@ -12,12 +12,28 @@ export interface Status {
   usage?: TokenUsage
 }
 
-export type StatusCallback = (status: Status) => void
+export type SessionSource = 'claude-code' | 'codex'
+
+export interface SessionInfo {
+  sessionId: string
+  source: SessionSource
+  status: PetState
+  action: string
+  usage?: TokenUsage
+}
+
+export interface MultiSessionStatus {
+  primary: Status
+  sessions: SessionInfo[]
+  sessionCount: number
+}
+
+export type MultiSessionCallback = (status: MultiSessionStatus) => void
 export type PackCallback = (packId: string) => void
 
 export interface ElectronAPI {
-  getStatus: () => Promise<Status>
-  onStatusUpdate: (callback: StatusCallback) => () => void
+  getStatus: () => Promise<MultiSessionStatus>
+  onStatusUpdate: (callback: MultiSessionCallback) => () => void
   dragStart: (x: number, y: number) => void
   dragMove: (x: number, y: number) => void
   dragEnd: () => void
