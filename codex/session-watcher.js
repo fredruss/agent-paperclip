@@ -50,45 +50,44 @@ function parseJsonlChunk(chunk, previousRemainder = '') {
  * Also watches the sessions directory for new session files and switches automatically.
  */
 async function watchSession(sessionFile, onEvent) {
-    let currentFile = sessionFile;
-    let watchedPath = sessionFile;
-    let offset = 0;
-    let reading = false;
-    let dirty = false;
-    let lineRemainder = '';
-    // Start from current file size (don't replay old events)
-    try {
-        const fileStat = await (0, promises_1.stat)(currentFile);
-        offset = fileStat.size;
+    const files = new Map();
+    async function addFile(filePath) {
+        let offset = 0;
+        try {
+            const fileStat = await (0, promises_1.stat)(filePath);
+            offset = fileStat.size;
+        }
+        catch {
+            offset = 0;
+        }
+        files.set(filePath, { offset, lineRemainder: '', reading: false, dirty: false });
+        fileWatcher.add(filePath);
     }
-    catch {
-        offset = 0;
-    }
-    async function readNewContent() {
-        if (reading) {
-            dirty = true;
+    async function processFile(filePath, state) {
+        if (state.reading) {
+            state.dirty = true;
             return;
         }
-        reading = true;
-        dirty = false;
+        state.reading = true;
+        state.dirty = false;
         try {
-            const fileStat = await (0, promises_1.stat)(currentFile);
-            if (fileStat.size <= offset)
+            const fileStat = await (0, promises_1.stat)(filePath);
+            if (fileStat.size <= state.offset)
                 return;
-            const fd = await (0, promises_1.open)(currentFile, 'r');
+            const fd = await (0, promises_1.open)(filePath, 'r');
             try {
-                const buf = Buffer.alloc(fileStat.size - offset);
-                await fd.read(buf, 0, buf.length, offset);
-                offset = fileStat.size;
+                const buf = Buffer.alloc(fileStat.size - state.offset);
+                await fd.read(buf, 0, buf.length, state.offset);
+                state.offset = fileStat.size;
                 const newContent = buf.toString('utf8');
                 if (debug)
-                    console.error(`[session-watcher] read ${buf.length} new bytes`);
-                const parsed = parseJsonlChunk(newContent, lineRemainder);
-                lineRemainder = parsed.remainder;
+                    console.error(`[session-watcher] read ${buf.length} new bytes from ${filePath}`);
+                const parsed = parseJsonlChunk(newContent, state.lineRemainder);
+                state.lineRemainder = parsed.remainder;
                 if (debug)
                     console.error(`[session-watcher] parsed ${parsed.entries.length} entries`);
                 for (const entry of parsed.entries) {
-                    onEvent(entry);
+                    onEvent(entry, filePath);
                 }
             }
             finally {
@@ -99,24 +98,29 @@ async function watchSession(sessionFile, onEvent) {
             // File may have been removed or rotated
         }
         finally {
-            reading = false;
-            if (dirty) {
-                dirty = false;
-                readNewContent();
+            state.reading = false;
+            if (state.dirty) {
+                state.dirty = false;
+                processFile(filePath, state);
             }
         }
     }
-    // Watch the current session file for changes
+    // Watch session files for changes
     const usePolling = process.platform === 'win32';
-    const fileWatcher = (0, chokidar_1.watch)(currentFile, {
+    const fileWatcher = (0, chokidar_1.watch)([], {
         persistent: true,
         ...(usePolling && { usePolling: true, interval: 500 })
     });
-    fileWatcher.on('change', () => {
+    fileWatcher.on('change', (changedPath) => {
+        const state = files.get(changedPath);
+        if (!state)
+            return;
         if (debug)
-            console.error(`[session-watcher] change detected in ${currentFile}`);
-        readNewContent();
+            console.error(`[session-watcher] change detected in ${changedPath}`);
+        processFile(changedPath, state);
     });
+    // Add the initial session file
+    await addFile(sessionFile);
     // Watch the sessions directory for new session files
     let dirWatcher = null;
     try {
@@ -126,16 +130,10 @@ async function watchSession(sessionFile, onEvent) {
             ignoreInitial: true
         });
         dirWatcher.on('add', (newPath) => {
-            if (newPath.endsWith('.jsonl') && newPath.includes('rollout-')) {
-                // Switch to watching the new session file
-                const oldPath = watchedPath;
-                currentFile = newPath;
-                watchedPath = newPath;
-                offset = 0;
-                lineRemainder = '';
-                fileWatcher.unwatch(oldPath);
-                fileWatcher.add(newPath);
-                readNewContent();
+            if (newPath.endsWith('.jsonl') && newPath.includes('rollout-') && !files.has(newPath)) {
+                addFile(newPath).then(() => {
+                    processFile(newPath, files.get(newPath));
+                });
             }
         });
     }

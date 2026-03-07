@@ -11,7 +11,7 @@
 
 import { existsSync } from 'fs'
 import { watch } from 'chokidar'
-import { writeStatus } from '../lib/status-writer'
+import { writeStatus, writeSessionStatus, removeSession, sessionIdFromPath } from '../lib/status-writer'
 import { findLatestSession, CODEX_HOME, SESSIONS_DIR } from './session-finder'
 import { watchSession, watchForFirstSession } from './session-watcher'
 import { mapCodexEvent, extractUsageFromEntry } from './event-mapper'
@@ -21,35 +21,60 @@ import type { SessionWatcher } from './session-watcher'
 
 const debug = !!process.env.COMPANION_DEBUG
 let watcher: SessionWatcher | null = null
-let latestUsage: TokenUsage | undefined
 
-function handleEvent(entry: CodexRolloutEntry): void {
-  if (debug) {
-    const subtype = entry.type === 'event_msg' || entry.type === 'response_item'
-      ? ` (${(entry as { payload?: { type?: string } }).payload?.type})`
-      : ''
-    console.error(`[watcher] event: ${entry.type}${subtype}`)
+export function createEventHandler(): (entry: CodexRolloutEntry, sessionFile: string) => void {
+  const usageBySession = new Map<string, TokenUsage>()
+
+  return function handleEvent(entry: CodexRolloutEntry, sessionFile: string): void {
+    const sessionId = sessionIdFromPath(sessionFile)
+
+    if (debug) {
+      const subtype = entry.type === 'event_msg' || entry.type === 'response_item'
+        ? ` (${(entry as { payload?: { type?: string } }).payload?.type})`
+        : ''
+      console.error(`[watcher] event: ${entry.type}${subtype} (session=${sessionId})`)
+    }
+
+    // A new session starts with session_meta; clear usage for this session.
+    if (entry.type === 'session_meta') {
+      usageBySession.delete(sessionId)
+    }
+
+    // Track usage from token_count events
+    const usage = extractUsageFromEntry(entry)
+    if (usage) usageBySession.set(sessionId, usage)
+
+    // Map to pet state
+    const update = mapCodexEvent(entry)
+    if (!update) return
+
+    const sessionUsage = update.usage ?? usageBySession.get(sessionId)
+
+    if (debug) console.error(`[watcher] -> ${update.status}: ${update.action}`)
+
+    // Write to sessions.json for multi-session support
+    writeSessionStatus(sessionId, 'codex', update.status, update.action, sessionUsage)
+      .catch((err) => {
+        console.error(`[watcher] writeSessionStatus failed:`, err)
+      })
+
+    // Also write legacy status.json for backward compat
+    writeStatus(update.status, update.action, sessionUsage ?? null)
+      .catch((err) => {
+        console.error(`[watcher] writeStatus failed:`, err)
+      })
+
+    // Clean up session on task_complete
+    if (entry.type === 'event_msg' && (entry.payload as { type?: string }).type === 'task_complete') {
+      usageBySession.delete(sessionId)
+      removeSession(sessionId).catch((err) => {
+        console.error(`[watcher] removeSession failed:`, err)
+      })
+    }
   }
-
-  // A new session starts with session_meta; clear usage from any previous session.
-  if (entry.type === 'session_meta') {
-    latestUsage = undefined
-  }
-
-  // Track usage from token_count events
-  const usage = extractUsageFromEntry(entry)
-  if (usage) latestUsage = usage
-
-  // Map to pet state
-  const update = mapCodexEvent(entry)
-  if (!update) return
-
-  if (debug) console.error(`[watcher] -> ${update.status}: ${update.action}`)
-  writeStatus(update.status, update.action, update.usage ?? latestUsage ?? null)
-    .catch((err) => {
-      console.error(`[watcher] writeStatus failed:`, err)
-    })
 }
+
+const handleEvent = createEventHandler()
 
 async function startSessionWatching(): Promise<void> {
   const sessionFile = await findLatestSession()

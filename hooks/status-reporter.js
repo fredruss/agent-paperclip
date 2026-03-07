@@ -69,8 +69,13 @@ function truncateThinking(text, maxLength = 40) {
 }
 async function writeSessionOrFallback(transcriptPath, status, action, usage = null) {
     if (transcriptPath) {
-        const sessionId = (0, status_writer_1.sessionIdFromPath)(transcriptPath);
-        await (0, status_writer_1.writeSessionStatus)(sessionId, 'claude-code', status, action, usage ?? undefined);
+        try {
+            const sessionId = (0, status_writer_1.sessionIdFromPath)(transcriptPath);
+            await (0, status_writer_1.writeSessionStatus)(sessionId, 'claude-code', status, action, usage ?? undefined);
+        }
+        catch {
+            // Session write failed — continue to legacy write below
+        }
     }
     // Always write single-session status too (backward compat until chunk 4 migrates the reader)
     await (0, status_writer_1.writeStatus)(status, action, usage);
