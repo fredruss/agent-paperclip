@@ -310,7 +310,7 @@ describe('handleEvent with transcript_path (multi-session)', () => {
     expect(mockWriteStatus).toHaveBeenCalledWith('done', 'All done!', { context: 100, output: 50 })
   })
 
-  it('calls removeSession on SessionEnd with transcript_path', async () => {
+  it('calls removeSession on SessionEnd with transcript_path without writing session status', async () => {
     mockExistsSync.mockReturnValue(false)
 
     const event: HookEvent = {
@@ -320,15 +320,24 @@ describe('handleEvent with transcript_path (multi-session)', () => {
 
     await handleEvent(event)
 
-    expect(mockWriteSessionStatus).toHaveBeenCalledWith(
-      'abcd1234',
-      'claude-code',
-      'idle',
-      'Session ended',
-      undefined
-    )
-    expect(mockWriteStatus).toHaveBeenCalledWith('idle', 'Session ended', null)
+    expect(mockWriteSessionStatus).not.toHaveBeenCalled()
     expect(mockRemoveSession).toHaveBeenCalledWith('abcd1234')
+    expect(mockWriteStatus).toHaveBeenCalledWith('idle', 'Session ended', null)
+  })
+
+  it('still writes legacy status when removeSession throws on SessionEnd', async () => {
+    mockExistsSync.mockReturnValue(false)
+    mockRemoveSession.mockRejectedValue(new Error('disk full'))
+
+    const event: HookEvent = {
+      hook_event_name: 'SessionEnd',
+      transcript_path: transcriptPath
+    }
+
+    await handleEvent(event)
+
+    expect(mockRemoveSession).toHaveBeenCalledWith('abcd1234')
+    expect(mockWriteStatus).toHaveBeenCalledWith('idle', 'Session ended', null)
   })
 
   it('does not call removeSession on SessionEnd without transcript_path', async () => {

@@ -206,10 +206,14 @@ async function handleEvent(event) {
             break;
         }
         case 'SessionEnd': {
-            await writeSessionOrFallback(transcript_path, 'idle', 'Session ended', usage);
             if (transcript_path) {
-                await (0, status_writer_1.removeSession)((0, status_writer_1.sessionIdFromPath)(transcript_path));
+                try {
+                    await (0, status_writer_1.removeSession)((0, status_writer_1.sessionIdFromPath)(transcript_path));
+                }
+                catch { /* best-effort cleanup */ }
             }
+            // Still write legacy status.json for backward compat
+            await (0, status_writer_1.writeStatus)('idle', 'Session ended', usage);
             break;
         }
         case 'Notification': {

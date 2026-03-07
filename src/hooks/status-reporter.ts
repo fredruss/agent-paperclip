@@ -247,10 +247,13 @@ export async function handleEvent(event: HookEvent): Promise<void> {
     }
 
     case 'SessionEnd': {
-      await writeSessionOrFallback(transcript_path, 'idle', 'Session ended', usage)
       if (transcript_path) {
-        await removeSession(sessionIdFromPath(transcript_path))
+        try {
+          await removeSession(sessionIdFromPath(transcript_path))
+        } catch { /* best-effort cleanup */ }
       }
+      // Still write legacy status.json for backward compat
+      await writeStatus('idle', 'Session ended', usage)
       break
     }
 
