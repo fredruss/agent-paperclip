@@ -107,7 +107,8 @@ function buildMultiSessionStatus(parsed: SessionsFileFormat): MultiSessionStatus
     usage: s.usage
   }))
 
-  return { primary, sessions, sessionCount: entries.length }
+  const activeCount = entries.filter((s) => s.status !== 'done').length
+  return { primary, sessions, sessionCount: activeCount }
 }
 
 function legacyToMultiSession(legacy: Status): MultiSessionStatus {
@@ -124,7 +125,7 @@ async function readMultiSessionStatus(): Promise<MultiSessionStatus> {
     const parsed = JSON.parse(content) as SessionsFileFormat
     const result = buildMultiSessionStatus(parsed)
     // If all sessions are stale, check legacy status.json too
-    if (result.sessionCount === 0) {
+    if (result.sessions.length === 0) {
       return legacyToMultiSession(await readLegacyStatus())
     }
     return result
