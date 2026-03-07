@@ -51,14 +51,16 @@ function parseJsonlChunk(chunk, previousRemainder = '') {
  */
 async function watchSession(sessionFile, onEvent) {
     const files = new Map();
-    async function addFile(filePath) {
+    async function addFile(filePath, skipExisting) {
         let offset = 0;
-        try {
-            const fileStat = await (0, promises_1.stat)(filePath);
-            offset = fileStat.size;
-        }
-        catch {
-            offset = 0;
+        if (skipExisting) {
+            try {
+                const fileStat = await (0, promises_1.stat)(filePath);
+                offset = fileStat.size;
+            }
+            catch {
+                offset = 0;
+            }
         }
         files.set(filePath, { offset, lineRemainder: '', reading: false, dirty: false });
         fileWatcher.add(filePath);
@@ -119,8 +121,8 @@ async function watchSession(sessionFile, onEvent) {
             console.error(`[session-watcher] change detected in ${changedPath}`);
         processFile(changedPath, state);
     });
-    // Add the initial session file
-    await addFile(sessionFile);
+    // Add the initial session file (skip existing content — don't replay old events)
+    await addFile(sessionFile, true);
     // Watch the sessions directory for new session files
     let dirWatcher = null;
     try {
@@ -131,7 +133,8 @@ async function watchSession(sessionFile, onEvent) {
         });
         dirWatcher.on('add', (newPath) => {
             if (newPath.endsWith('.jsonl') && newPath.includes('rollout-') && !files.has(newPath)) {
-                addFile(newPath).then(() => {
+                // Read from start — new files may already have content when the add event fires
+                addFile(newPath, false).then(() => {
                     processFile(newPath, files.get(newPath));
                 });
             }

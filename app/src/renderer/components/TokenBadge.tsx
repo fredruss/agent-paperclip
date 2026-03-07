@@ -1,10 +1,10 @@
 import { type ReactNode } from 'react'
 import { useAutoHide } from '../hooks/useAutoHide'
-import type { TokenUsage, PetState } from '../../shared/types'
+import type { SessionInfo, PetState } from '../../shared/types'
 import './TokenBadge.css'
 
 interface TokenBadgeProps {
-  usage: TokenUsage | undefined
+  sessions: SessionInfo[]
   status: PetState
 }
 
@@ -23,23 +23,43 @@ export function formatTokens(count: number): string {
   return count.toString()
 }
 
-export function TokenBadge({ usage, status }: TokenBadgeProps): ReactNode {
-  const visible = useAutoHide(status === 'idle', HIDE_DELAY, [usage, status])
-
-  // Don't show if no usage data or not visible
-  if (!usage || !visible) {
-    return null
-  }
-
-  // Show total context size (input + cache_creation + cache_read)
+function getContextTokens(usage: SessionInfo['usage']): number {
+  if (!usage) return 0
   // Support legacy format (input/cacheRead) for backwards compatibility
   type LegacyUsage = { input?: number; cacheRead?: number }
   const legacy = usage as unknown as LegacyUsage
-  const totalTokens = usage.context ?? ((legacy.input || 0) + (legacy.cacheRead || 0))
+  return usage.context ?? ((legacy.input || 0) + (legacy.cacheRead || 0))
+}
+
+export function TokenBadge({ sessions, status }: TokenBadgeProps): ReactNode {
+  const sessionsWithUsage = sessions.filter((s) => s.usage)
+  const visible = useAutoHide(status === 'idle', HIDE_DELAY, [sessions, status])
+
+  if (sessionsWithUsage.length === 0 || !visible) {
+    return null
+  }
+
+  if (sessionsWithUsage.length === 1) {
+    return (
+      <div className="token-badge">
+        {formatTokens(getContextTokens(sessionsWithUsage[0].usage))}
+      </div>
+    )
+  }
+
+  // Multiple sessions: show up to 3, then +N for overflow
+  const shown = sessionsWithUsage.slice(0, 3)
+  const overflow = sessionsWithUsage.length - 3
 
   return (
     <div className="token-badge">
-      {formatTokens(totalTokens)}
+      {shown.map((s, i) => (
+        <span key={s.sessionId}>
+          {i > 0 && ' \u00b7 '}
+          {formatTokens(getContextTokens(s.usage))}
+        </span>
+      ))}
+      {overflow > 0 && ` +${overflow}`}
     </div>
   )
 }

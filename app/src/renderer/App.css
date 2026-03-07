@@ -9,3 +9,7 @@
   gap: 10px;
   user-select: none;
 }
+
+.pet-wrapper {
+  position: relative;
+}

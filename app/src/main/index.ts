@@ -4,13 +4,15 @@ import { watch } from 'chokidar'
 import { readFile, mkdir, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
-import type { Status } from '../shared/types'
+import type { Status, MultiSessionStatus, SessionInfo, SessionSource, TokenUsage } from '../shared/types'
 import { startDevCodexWatcher, stopDevCodexWatcher } from './codex-watcher'
 
 const STATUS_DIR = join(homedir(), '.agent-paperclip')
 const STATUS_FILE = join(STATUS_DIR, 'status.json')
+const SESSIONS_FILE = join(STATUS_DIR, 'sessions.json')
 const SETTINGS_FILE = join(STATUS_DIR, 'settings.json')
 const debug = !!process.env.COMPANION_DEBUG
+const STALE_SESSION_MS = 30_000
 
 let mainWindow: BrowserWindow | null = null
 
@@ -53,13 +55,82 @@ async function ensureStatusDir(): Promise<void> {
   }
 }
 
-async function readStatus(): Promise<Status> {
+async function readLegacyStatus(): Promise<Status> {
   try {
     const content = await readFile(STATUS_FILE, 'utf-8')
     const status = JSON.parse(content) as Status
     return normalizeStatus(status)
   } catch {
     return { status: 'idle', action: 'Waiting for Agent...', timestamp: Date.now() }
+  }
+}
+
+interface SessionsFileFormat {
+  sessions: Record<string, {
+    sessionId: string
+    source: SessionSource
+    status: string
+    action: string
+    timestamp: number
+    lastActivity: number
+    usage?: TokenUsage
+  }>
+}
+
+function buildMultiSessionStatus(parsed: SessionsFileFormat): MultiSessionStatus {
+  const now = Date.now()
+  const entries = Object.values(parsed.sessions)
+    .filter((s) => now - s.lastActivity < STALE_SESSION_MS)
+    .sort((a, b) => b.lastActivity - a.lastActivity)
+
+  if (entries.length === 0) {
+    return {
+      primary: { status: 'idle', action: 'Waiting for Agent...', timestamp: now },
+      sessions: [],
+      sessionCount: 0
+    }
+  }
+
+  const first = entries[0]
+  const primary = normalizeStatus({
+    status: first.status as Status['status'],
+    action: first.action,
+    timestamp: first.lastActivity,
+    usage: first.usage
+  })
+
+  const sessions: SessionInfo[] = entries.map((s) => ({
+    sessionId: s.sessionId,
+    source: s.source,
+    status: s.status as SessionInfo['status'],
+    action: s.action,
+    usage: s.usage
+  }))
+
+  return { primary, sessions, sessionCount: entries.length }
+}
+
+function legacyToMultiSession(legacy: Status): MultiSessionStatus {
+  const isActive = legacy.status !== 'idle'
+  const sessions: SessionInfo[] = isActive
+    ? [{ sessionId: 'legacy', source: 'claude-code', status: legacy.status, action: legacy.action, usage: legacy.usage }]
+    : []
+  return { primary: legacy, sessions, sessionCount: isActive ? 1 : 0 }
+}
+
+async function readMultiSessionStatus(): Promise<MultiSessionStatus> {
+  try {
+    const content = await readFile(SESSIONS_FILE, 'utf-8')
+    const parsed = JSON.parse(content) as SessionsFileFormat
+    const result = buildMultiSessionStatus(parsed)
+    // If all sessions are stale, check legacy status.json too
+    if (result.sessionCount === 0) {
+      return legacyToMultiSession(await readLegacyStatus())
+    }
+    return result
+  } catch {
+    // Fall back to legacy status.json
+    return legacyToMultiSession(await readLegacyStatus())
   }
 }
 
@@ -140,10 +211,10 @@ function createWindow(): void {
 }
 
 function setupStatusWatcher(): void {
-  if (debug) console.log(`[status-watcher] watching ${STATUS_FILE}`)
+  if (debug) console.log(`[status-watcher] watching ${SESSIONS_FILE} and ${STATUS_FILE}`)
 
   const usePolling = process.platform === 'win32'
-  const watcher = watch(STATUS_FILE, {
+  const watcher = watch([SESSIONS_FILE, STATUS_FILE], {
     persistent: true,
     ignoreInitial: false,
     ...(usePolling && { usePolling: true, interval: 250 })
@@ -164,14 +235,14 @@ function setupStatusWatcher(): void {
 
 async function sendStatus(): Promise<void> {
   if (!mainWindow) return
-  const status = await readStatus()
-  if (debug) console.log(`[status-watcher] sending: ${status.status} - ${status.action}`)
+  const status = await readMultiSessionStatus()
+  if (debug) console.log(`[status-watcher] sending: ${status.primary.status} - ${status.primary.action} (${status.sessionCount} sessions)`)
   mainWindow.webContents.send('status-update', status)
 }
 
 // IPC handlers
 ipcMain.handle('get-status', async () => {
-  return await readStatus()
+  return await readMultiSessionStatus()
 })
 
 ipcMain.handle('get-active-pack', () => {
