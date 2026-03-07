@@ -184,6 +184,7 @@ describe('writeSessionStatus', () => {
     ['an array', '[]'],
     ['a string', '"hello"'],
     ['sessions as array', '{"sessions": []}'],
+    ['sessions as null', '{"sessions": null}'],
     ['a number', '42']
   ])('recovers when sessions.json contains %s', async (_label, content) => {
     mockReadFile.mockResolvedValue(content)

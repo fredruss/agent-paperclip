@@ -67,6 +67,14 @@ function truncateThinking(text, maxLength = 40) {
     }
     return truncated + '...';
 }
+async function writeSessionOrFallback(transcriptPath, status, action, usage = null) {
+    if (transcriptPath) {
+        const sessionId = (0, status_writer_1.sessionIdFromPath)(transcriptPath);
+        await (0, status_writer_1.writeSessionStatus)(sessionId, 'claude-code', status, action, usage ?? undefined);
+    }
+    // Always write single-session status too (backward compat until chunk 4 migrates the reader)
+    await (0, status_writer_1.writeStatus)(status, action, usage);
+}
 /**
  * Parse transcript JSONL file to extract usage and thinking content.
  * Usage shows how "full" the context window is.
@@ -142,7 +150,7 @@ async function handleEvent(event) {
     switch (hook_event_name) {
         case 'UserPromptSubmit': {
             // Don't display user prompts for privacy - only show generic status
-            await (0, status_writer_1.writeStatus)('thinking', 'Thinking...', usage);
+            await writeSessionOrFallback(transcript_path, 'thinking', 'Thinking...', usage);
             break;
         }
         case 'PreToolUse': {
@@ -168,42 +176,45 @@ async function handleEvent(event) {
             else if (tool_name === 'Grep' && tool_input?.pattern) {
                 action = `Searching for "${tool_input.pattern.slice(0, 20)}${tool_input.pattern.length > 20 ? '...' : ''}"...`;
             }
-            await (0, status_writer_1.writeStatus)(state, action, usage);
+            await writeSessionOrFallback(transcript_path, state, action, usage);
             break;
         }
         case 'PostToolUse': {
             if (tool_response && tool_response.success === false) {
-                await (0, status_writer_1.writeStatus)('error', 'Something went wrong...', usage);
+                await writeSessionOrFallback(transcript_path, 'error', 'Something went wrong...', usage);
             }
             else {
                 // Tool completed successfully - return to thinking state
                 // Show actual thinking content if available
                 const action = thinking ? `Thinking: "${thinking}"` : 'Thinking...';
-                await (0, status_writer_1.writeStatus)('thinking', action, usage);
+                await writeSessionOrFallback(transcript_path, 'thinking', action, usage);
             }
             break;
         }
         case 'Stop': {
             // Stop event just indicates Claude finished - show "done" state
-            await (0, status_writer_1.writeStatus)('done', 'All done!', usage);
+            await writeSessionOrFallback(transcript_path, 'done', 'All done!', usage);
             break;
         }
         case 'SessionStart': {
-            await (0, status_writer_1.writeStatus)('idle', 'Session started!');
+            await writeSessionOrFallback(transcript_path, 'idle', 'Session started!');
             break;
         }
         case 'SessionEnd': {
-            await (0, status_writer_1.writeStatus)('idle', 'Session ended', usage);
+            await writeSessionOrFallback(transcript_path, 'idle', 'Session ended', usage);
+            if (transcript_path) {
+                await (0, status_writer_1.removeSession)((0, status_writer_1.sessionIdFromPath)(transcript_path));
+            }
             break;
         }
         case 'Notification': {
             const { notification_type } = event;
             switch (notification_type) {
                 case 'permission_prompt':
-                    await (0, status_writer_1.writeStatus)('waiting', 'Needs your permission...', usage);
+                    await writeSessionOrFallback(transcript_path, 'waiting', 'Needs your permission...', usage);
                     break;
                 case 'elicitation_dialog':
-                    await (0, status_writer_1.writeStatus)('waiting', 'Has a question for you...', usage);
+                    await writeSessionOrFallback(transcript_path, 'waiting', 'Has a question for you...', usage);
                     break;
                 case 'idle_prompt':
                     // User has been idle for 60+ seconds - just ignore

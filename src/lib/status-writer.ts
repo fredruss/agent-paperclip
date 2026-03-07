@@ -59,7 +59,7 @@ async function readSessionsFile(): Promise<SessionsFile> {
   try {
     const raw = await readFile(SESSIONS_FILE, 'utf-8')
     const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && typeof parsed.sessions === 'object' && !Array.isArray(parsed.sessions)) {
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.sessions && typeof parsed.sessions === 'object' && !Array.isArray(parsed.sessions)) {
       return parsed as SessionsFile
     }
     return { sessions: {} }

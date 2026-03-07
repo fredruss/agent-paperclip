@@ -18,7 +18,7 @@
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import type { PetState, TokenUsage, HookEvent } from '../shared/types'
-import { writeStatus } from '../lib/status-writer'
+import { writeStatus, writeSessionStatus, removeSession, sessionIdFromPath } from '../lib/status-writer'
 
 // Tool name to human-readable action mapping
 const TOOL_ACTIONS: Record<string, string> = {
@@ -73,6 +73,24 @@ function truncateThinking(text: string, maxLength: number = 40): string {
     return truncated.slice(0, lastSpace) + '...'
   }
   return truncated + '...'
+}
+
+async function writeSessionOrFallback(
+  transcriptPath: string | undefined,
+  status: PetState,
+  action: string,
+  usage: TokenUsage | null = null
+): Promise<void> {
+  if (transcriptPath) {
+    try {
+      const sessionId = sessionIdFromPath(transcriptPath)
+      await writeSessionStatus(sessionId, 'claude-code', status, action, usage ?? undefined)
+    } catch {
+      // Session write failed — continue to legacy write below
+    }
+  }
+  // Always write single-session status too (backward compat until chunk 4 migrates the reader)
+  await writeStatus(status, action, usage)
 }
 
 /**
@@ -176,7 +194,7 @@ export async function handleEvent(event: HookEvent): Promise<void> {
   switch (hook_event_name) {
     case 'UserPromptSubmit': {
       // Don't display user prompts for privacy - only show generic status
-      await writeStatus('thinking', 'Thinking...', usage)
+      await writeSessionOrFallback(transcript_path, 'thinking', 'Thinking...', usage)
       break
     }
 
@@ -201,35 +219,38 @@ export async function handleEvent(event: HookEvent): Promise<void> {
         action = `Searching for "${tool_input.pattern.slice(0, 20)}${tool_input.pattern.length > 20 ? '...' : ''}"...`
       }
 
-      await writeStatus(state, action, usage)
+      await writeSessionOrFallback(transcript_path, state, action, usage)
       break
     }
 
     case 'PostToolUse': {
       if (tool_response && tool_response.success === false) {
-        await writeStatus('error', 'Something went wrong...', usage)
+        await writeSessionOrFallback(transcript_path, 'error', 'Something went wrong...', usage)
       } else {
         // Tool completed successfully - return to thinking state
         // Show actual thinking content if available
         const action = thinking ? `Thinking: "${thinking}"` : 'Thinking...'
-        await writeStatus('thinking', action, usage)
+        await writeSessionOrFallback(transcript_path, 'thinking', action, usage)
       }
       break
     }
 
     case 'Stop': {
       // Stop event just indicates Claude finished - show "done" state
-      await writeStatus('done', 'All done!', usage)
+      await writeSessionOrFallback(transcript_path, 'done', 'All done!', usage)
       break
     }
 
     case 'SessionStart': {
-      await writeStatus('idle', 'Session started!')
+      await writeSessionOrFallback(transcript_path, 'idle', 'Session started!')
       break
     }
 
     case 'SessionEnd': {
-      await writeStatus('idle', 'Session ended', usage)
+      await writeSessionOrFallback(transcript_path, 'idle', 'Session ended', usage)
+      if (transcript_path) {
+        await removeSession(sessionIdFromPath(transcript_path))
+      }
       break
     }
 
@@ -237,10 +258,10 @@ export async function handleEvent(event: HookEvent): Promise<void> {
       const { notification_type } = event
       switch (notification_type) {
         case 'permission_prompt':
-          await writeStatus('waiting', 'Needs your permission...', usage)
+          await writeSessionOrFallback(transcript_path, 'waiting', 'Needs your permission...', usage)
           break
         case 'elicitation_dialog':
-          await writeStatus('waiting', 'Has a question for you...', usage)
+          await writeSessionOrFallback(transcript_path, 'waiting', 'Has a question for you...', usage)
           break
         case 'idle_prompt':
           // User has been idle for 60+ seconds - just ignore

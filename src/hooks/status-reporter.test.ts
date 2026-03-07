@@ -6,6 +6,9 @@ import type { HookEvent } from '../shared/types'
 const mockExistsSync = vi.fn()
 const mockReadFile = vi.fn()
 const mockWriteStatus = vi.fn()
+const mockWriteSessionStatus = vi.fn()
+const mockRemoveSession = vi.fn()
+const mockSessionIdFromPath = vi.fn(() => 'abcd1234')
 
 vi.mock('fs', () => ({
   default: { existsSync: mockExistsSync },
@@ -18,7 +21,10 @@ vi.mock('fs/promises', () => ({
 }))
 
 vi.mock('../lib/status-writer', () => ({
-  writeStatus: mockWriteStatus
+  writeStatus: mockWriteStatus,
+  writeSessionStatus: mockWriteSessionStatus,
+  removeSession: mockRemoveSession,
+  sessionIdFromPath: mockSessionIdFromPath
 }))
 
 // Now import the module under test
@@ -29,6 +35,8 @@ describe('handleEvent', () => {
     vi.clearAllMocks()
     mockExistsSync.mockReturnValue(true)
     mockWriteStatus.mockResolvedValue(undefined)
+    mockWriteSessionStatus.mockResolvedValue(undefined)
+    mockRemoveSession.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -237,6 +245,130 @@ describe('handleEvent', () => {
 
     await handleEvent(event)
 
+    expect(mockWriteStatus).toHaveBeenCalledWith('thinking', 'Thinking...', null)
+  })
+})
+
+describe('handleEvent with transcript_path (multi-session)', () => {
+  const transcriptPath = '/path/to/transcript.jsonl'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExistsSync.mockReturnValue(true)
+    mockWriteStatus.mockResolvedValue(undefined)
+    mockWriteSessionStatus.mockResolvedValue(undefined)
+    mockRemoveSession.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('calls writeSessionStatus and writeStatus when transcript_path is set', async () => {
+    const event: HookEvent = {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Read',
+      tool_input: { file_path: '/path/to/file.ts' },
+      transcript_path: transcriptPath
+    }
+
+    await handleEvent(event)
+
+    expect(mockSessionIdFromPath).toHaveBeenCalledWith(transcriptPath)
+    expect(mockWriteSessionStatus).toHaveBeenCalledWith(
+      'abcd1234',
+      'claude-code',
+      'reading',
+      'Reading file.ts...',
+      undefined
+    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('reading', 'Reading file.ts...', null)
+  })
+
+  it('calls writeSessionStatus with usage when available', async () => {
+    mockExistsSync.mockReturnValue(true)
+    mockReadFile.mockResolvedValue(
+      JSON.stringify({
+        message: { usage: { input_tokens: 100, output_tokens: 50 } }
+      })
+    )
+
+    const event: HookEvent = {
+      hook_event_name: 'Stop',
+      transcript_path: transcriptPath
+    }
+
+    await handleEvent(event)
+
+    expect(mockWriteSessionStatus).toHaveBeenCalledWith(
+      'abcd1234',
+      'claude-code',
+      'done',
+      'All done!',
+      { context: 100, output: 50 }
+    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('done', 'All done!', { context: 100, output: 50 })
+  })
+
+  it('calls removeSession on SessionEnd with transcript_path', async () => {
+    mockExistsSync.mockReturnValue(false)
+
+    const event: HookEvent = {
+      hook_event_name: 'SessionEnd',
+      transcript_path: transcriptPath
+    }
+
+    await handleEvent(event)
+
+    expect(mockWriteSessionStatus).toHaveBeenCalledWith(
+      'abcd1234',
+      'claude-code',
+      'idle',
+      'Session ended',
+      undefined
+    )
+    expect(mockWriteStatus).toHaveBeenCalledWith('idle', 'Session ended', null)
+    expect(mockRemoveSession).toHaveBeenCalledWith('abcd1234')
+  })
+
+  it('does not call removeSession on SessionEnd without transcript_path', async () => {
+    const event: HookEvent = {
+      hook_event_name: 'SessionEnd'
+    }
+
+    await handleEvent(event)
+
+    expect(mockWriteSessionStatus).not.toHaveBeenCalled()
+    expect(mockWriteStatus).toHaveBeenCalledWith('idle', 'Session ended', null)
+    expect(mockRemoveSession).not.toHaveBeenCalled()
+  })
+
+  it('still calls writeStatus when writeSessionStatus throws', async () => {
+    mockExistsSync.mockReturnValue(false)
+    mockWriteSessionStatus.mockRejectedValue(new Error('disk full'))
+
+    const event: HookEvent = {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Read',
+      tool_input: { file_path: '/path/to/file.ts' },
+      transcript_path: transcriptPath
+    }
+
+    await handleEvent(event)
+
+    expect(mockWriteSessionStatus).toHaveBeenCalled()
+    expect(mockWriteStatus).toHaveBeenCalledWith('reading', 'Reading file.ts...', null)
+  })
+
+  it('does not call writeSessionStatus when transcript_path is undefined', async () => {
+    const event: HookEvent = {
+      hook_event_name: 'UserPromptSubmit',
+      user_prompt: 'Hello'
+    }
+
+    await handleEvent(event)
+
+    expect(mockWriteSessionStatus).not.toHaveBeenCalled()
     expect(mockWriteStatus).toHaveBeenCalledWith('thinking', 'Thinking...', null)
   })
 })
