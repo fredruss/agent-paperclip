@@ -13,6 +13,7 @@ const SESSIONS_FILE = join(STATUS_DIR, 'sessions.json')
 const SETTINGS_FILE = join(STATUS_DIR, 'settings.json')
 const debug = !!process.env.COMPANION_DEBUG
 const STALE_SESSION_MS = 30_000
+const STALE_INTERACTIVE_MS = 300_000 // 5 min for waiting/prompt states
 
 let mainWindow: BrowserWindow | null = null
 
@@ -79,8 +80,12 @@ interface SessionsFileFormat {
 
 function buildMultiSessionStatus(parsed: SessionsFileFormat): MultiSessionStatus {
   const now = Date.now()
+  const INTERACTIVE_STATES = new Set(['waiting'])
   const entries = Object.values(parsed.sessions)
-    .filter((s) => now - s.lastActivity < STALE_SESSION_MS)
+    .filter((s) => {
+      const timeout = INTERACTIVE_STATES.has(s.status) ? STALE_INTERACTIVE_MS : STALE_SESSION_MS
+      return now - s.lastActivity < timeout
+    })
     .sort((a, b) => b.lastActivity - a.lastActivity)
 
   if (entries.length === 0) {
@@ -91,7 +96,7 @@ function buildMultiSessionStatus(parsed: SessionsFileFormat): MultiSessionStatus
     }
   }
 
-  const first = entries[0]
+  const first = entries.find((e) => e.status !== 'done') ?? entries[0]
   const primary = normalizeStatus({
     status: first.status as Status['status'],
     action: first.action,
@@ -112,7 +117,7 @@ function buildMultiSessionStatus(parsed: SessionsFileFormat): MultiSessionStatus
 }
 
 function legacyToMultiSession(legacy: Status): MultiSessionStatus {
-  const isActive = legacy.status !== 'idle'
+  const isActive = legacy.status !== 'idle' && legacy.status !== 'done'
   const sessions: SessionInfo[] = isActive
     ? [{ sessionId: 'legacy', source: 'claude-code', status: legacy.status, action: legacy.action, usage: legacy.usage }]
     : []

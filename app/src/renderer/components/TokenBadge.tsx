@@ -32,7 +32,7 @@ function getContextTokens(usage: SessionInfo['usage']): number {
 }
 
 export function TokenBadge({ sessions, status }: TokenBadgeProps): ReactNode {
-  const sessionsWithUsage = sessions.filter((s) => s.usage)
+  const sessionsWithUsage = sessions.filter((s) => s.usage && s.status !== 'done')
   const visible = useAutoHide(status === 'idle', HIDE_DELAY, [sessions, status])
 
   if (sessionsWithUsage.length === 0 || !visible) {

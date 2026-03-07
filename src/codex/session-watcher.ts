@@ -104,12 +104,13 @@ export async function watchSession(
       const fd = await open(filePath, 'r')
       try {
         const buf = Buffer.alloc(bytesToRead)
-        await fd.read(buf, 0, buf.length, state.offset)
-        state.offset += bytesToRead
+        const { bytesRead } = await fd.read(buf, 0, buf.length, state.offset)
+        if (bytesRead === 0) return
+        state.offset += bytesRead
         state.dirty = state.offset < fileStat.size
 
-        const newContent = buf.toString('utf8')
-        if (debug) console.error(`[session-watcher] read ${buf.length} new bytes from ${filePath}`)
+        const newContent = buf.toString('utf8', 0, bytesRead)
+        if (debug) console.error(`[session-watcher] read ${bytesRead} new bytes from ${filePath}`)
         const parsed = parseJsonlChunk(newContent, state.lineRemainder)
         state.lineRemainder = parsed.remainder
 

@@ -85,7 +85,7 @@ export async function writeSessionStatus(
       source,
       status,
       action,
-      timestamp: now,
+      timestamp: file.sessions[sessionId]?.timestamp ?? now,
       lastActivity: now,
       ...(usage ? { usage } : {})
     }
