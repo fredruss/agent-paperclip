@@ -40,7 +40,7 @@ export function useSound(state: PetState, isHydrated: boolean, lastUpdateSource:
 
     const src = sounds[state]
     if (src) {
-      new Audio(src).play()
+      new Audio(src).play().catch(() => {})
     }
   }, [isHydrated, lastUpdateSource, state])
 }

@@ -60,7 +60,7 @@ export function useStatus(): UseStatusResult {
     api.getStatus().then((initialStatus) => {
       if (disposed) return
 
-      if (!sawLiveUpdate || initialStatus.primary.timestamp >= latestStatusTimestampRef.current) {
+      if (!sawLiveUpdate || initialStatus.primary.timestamp > latestStatusTimestampRef.current) {
         latestStatusTimestampRef.current = Math.max(latestStatusTimestampRef.current, initialStatus.primary.timestamp)
         setStatus({
           ...initialStatus,
