@@ -40,6 +40,8 @@ export interface ElectronAPI {
   getActivePack: () => Promise<string>
   showPackMenu: () => void
   onPackChanged: (callback: PackCallback) => () => void
+  getSoundEnabled: () => Promise<boolean>
+  onSoundChanged: (callback: (enabled: boolean) => void) => () => void
 }
 
 declare global {

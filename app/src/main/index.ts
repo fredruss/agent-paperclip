@@ -26,6 +26,7 @@ const STICKER_PACKS = [
 ]
 
 let activePack = 'paperclip'
+let soundEnabled = true
 const STALE_ACTIVITY_MS = 10_000
 
 function stripUsage(status: Status): Status {
@@ -142,6 +143,7 @@ async function readMultiSessionStatus(): Promise<MultiSessionStatus> {
 
 interface Settings {
   activePack: string
+  soundEnabled: boolean
 }
 
 async function loadSettings(): Promise<void> {
@@ -151,19 +153,22 @@ async function loadSettings(): Promise<void> {
     if (settings.activePack && STICKER_PACKS.some((p) => p.id === settings.activePack)) {
       activePack = settings.activePack
     }
+    if (typeof settings.soundEnabled === 'boolean') {
+      soundEnabled = settings.soundEnabled
+    }
   } catch {
     // Use defaults
   }
 }
 
 async function saveSettings(): Promise<void> {
-  await writeFile(SETTINGS_FILE, JSON.stringify({ activePack }, null, 2))
+  await writeFile(SETTINGS_FILE, JSON.stringify({ activePack, soundEnabled }, null, 2))
 }
 
 function showPackContextMenu(): void {
   if (!mainWindow) return
 
-  const template = STICKER_PACKS.map((pack) => ({
+  const packItems = STICKER_PACKS.map((pack) => ({
     label: pack.name,
     type: 'radio' as const,
     checked: pack.id === activePack,
@@ -176,7 +181,22 @@ function showPackContextMenu(): void {
     }
   }))
 
-  const menu = Menu.buildFromTemplate(template)
+  const menu = Menu.buildFromTemplate([
+    ...packItems,
+    { type: 'separator' },
+    {
+      label: 'Sound',
+      type: 'checkbox',
+      checked: soundEnabled,
+      click: (): void => {
+        soundEnabled = !soundEnabled
+        saveSettings().catch((err) => {
+          console.error('Failed to save settings:', err)
+        })
+        mainWindow?.webContents.send('sound-changed', soundEnabled)
+      }
+    }
+  ])
   menu.popup({ window: mainWindow })
 }
 
@@ -253,6 +273,10 @@ ipcMain.handle('get-status', async () => {
 
 ipcMain.handle('get-active-pack', () => {
   return activePack
+})
+
+ipcMain.handle('get-sound-enabled', () => {
+  return soundEnabled
 })
 
 // Programmatic drag state

@@ -33,5 +33,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => {
       ipcRenderer.removeListener('pack-changed', handler)
     }
+  },
+  getSoundEnabled: (): Promise<boolean> => ipcRenderer.invoke('get-sound-enabled'),
+  onSoundChanged: (callback: (enabled: boolean) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, enabled: boolean): void => {
+      callback(enabled)
+    }
+    ipcRenderer.on('sound-changed', handler)
+    return () => {
+      ipcRenderer.removeListener('sound-changed', handler)
+    }
   }
 })

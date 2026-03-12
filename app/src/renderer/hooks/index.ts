@@ -1,4 +1,5 @@
 export { useStatus } from './useStatus'
 export { useStateTransition } from './useStateTransition'
 export { useAutoHide } from './useAutoHide'
+export { useSound } from './useSound'
 export type { MultiSessionStatus } from './useStatus'
