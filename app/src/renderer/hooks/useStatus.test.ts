@@ -3,6 +3,21 @@ import { renderHook, act } from '@testing-library/react'
 import { useStatus } from './useStatus'
 import type { ElectronAPI, MultiSessionStatus, MultiSessionCallback } from '../../shared/types'
 
+function createDeferred<T>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
+  reject: (reason?: unknown) => void
+} {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+
+  return { promise, resolve, reject }
+}
+
 function makeMultiStatus(overrides: Partial<MultiSessionStatus> = {}): MultiSessionStatus {
   return {
     primary: { status: 'idle', action: 'Waiting for Agent...', timestamp: Date.now() },
@@ -36,6 +51,8 @@ describe('useStatus', () => {
       getActivePack: vi.fn(),
       showPackMenu: vi.fn(),
       onPackChanged: vi.fn(),
+      getSoundEnabled: vi.fn(),
+      onSoundChanged: vi.fn(),
     } as unknown as ElectronAPI
   })
 
@@ -64,6 +81,8 @@ describe('useStatus', () => {
     expect(result.current.primary.status).toBe('working')
     expect(result.current.primary.action).toBe('Working...')
     expect(result.current.sessionCount).toBe(1)
+    expect(result.current.isHydrated).toBe(true)
+    expect(result.current.lastUpdateSource).toBe('snapshot')
   })
 
   it('updates status when IPC callback fires', async () => {
@@ -89,6 +108,8 @@ describe('useStatus', () => {
 
     expect(result.current.primary.status).toBe('reading')
     expect(result.current.primary.action).toBe('Reading file...')
+    expect(result.current.isHydrated).toBe(true)
+    expect(result.current.lastUpdateSource).toBe('live')
   })
 
   it('transitions from done to idle after 4000ms', async () => {
@@ -118,6 +139,7 @@ describe('useStatus', () => {
 
     expect(result.current.primary.status).toBe('idle')
     expect(result.current.primary.action).toBe('Waiting for Agent...')
+    expect(result.current.lastUpdateSource).toBe('local')
 
     vi.useRealTimers()
   })
@@ -131,6 +153,7 @@ describe('useStatus', () => {
     expect(result.current.primary.status).toBe('idle')
     expect(result.current.primary.action).toBe('Waiting for Agent...')
     expect(result.current.sessionCount).toBe(0)
+    expect(result.current.isHydrated).toBe(true)
   })
 
   it('cleans up subscriptions on unmount', async () => {
@@ -233,6 +256,7 @@ describe('useStatus', () => {
 
     expect(result.current.primary.status).toBe('idle')
     expect(result.current.primary.action).toBe('Waiting for Agent...')
+    expect(result.current.isHydrated).toBe(true)
   })
 
   it('includes usage data when present', async () => {
@@ -264,5 +288,38 @@ describe('useStatus', () => {
       context: 1000,
       output: 500
     })
+  })
+
+  it('keeps a live update when the initial snapshot resolves later with an older timestamp', async () => {
+    const snapshot = makeMultiStatus({
+      primary: { status: 'done', action: 'All done!', timestamp: 100 }
+    })
+    const liveStatus = makeMultiStatus({
+      primary: { status: 'working', action: 'Working...', timestamp: 200 },
+      sessionCount: 1,
+      sessions: [{ sessionId: 's1', source: 'claude-code', status: 'working', action: 'Working...' }]
+    })
+    const deferred = createDeferred<MultiSessionStatus>()
+
+    mockGetStatus.mockReturnValue(deferred.promise)
+
+    const { result } = renderHook(() => useStatus())
+
+    act(() => {
+      statusCallback?.(liveStatus)
+    })
+
+    expect(result.current.primary.status).toBe('working')
+    expect(result.current.lastUpdateSource).toBe('live')
+    expect(result.current.isHydrated).toBe(true)
+
+    await act(async () => {
+      deferred.resolve(snapshot)
+      await deferred.promise
+    })
+
+    expect(result.current.primary.status).toBe('working')
+    expect(result.current.primary.action).toBe('Working...')
+    expect(result.current.lastUpdateSource).toBe('live')
   })
 })

@@ -1,10 +1,11 @@
 import { type ReactNode } from 'react'
 import { Pet, StatusBubble, TokenBadge, SessionCount } from './components'
-import { useStatus } from './hooks'
+import { useStatus, useSound } from './hooks'
 import './App.css'
 
 function App(): ReactNode {
-  const { primary, sessions, sessionCount } = useStatus()
+  const { primary, sessions, sessionCount, isHydrated, lastUpdateSource } = useStatus()
+  useSound(primary.status, isHydrated, lastUpdateSource)
 
   return (
     <div className="app-container">
