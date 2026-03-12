@@ -14,6 +14,7 @@ import { SESSIONS_DIR } from './session-finder'
 
 const debug = !!process.env.COMPANION_DEBUG
 const MAX_CHUNK_BYTES = 5 * 1024 * 1024 // 5 MB
+export const WINDOWS_POLL_INTERVAL_MS = 500
 
 export type EventCallback = (entry: CodexRolloutEntry, sessionFile: string) => void
 
@@ -31,6 +32,14 @@ export interface SessionWatcher {
 export interface ParsedChunk {
   entries: CodexRolloutEntry[]
   remainder: string
+}
+
+export function getWatchOptions(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    persistent: true,
+    ...extra,
+    ...(process.platform === 'win32' ? { usePolling: true, interval: WINDOWS_POLL_INTERVAL_MS } : {})
+  }
 }
 
 /**
@@ -85,6 +94,7 @@ export async function watchSession(
         offset = 0
       }
     }
+    if (debug) console.error(`[session-watcher] tracking ${filePath} (skipExisting=${skipExisting}, offset=${offset})`)
     files.set(filePath, { offset, lineRemainder: '', reading: false, dirty: false })
     fileWatcher.add(filePath)
   }
@@ -133,11 +143,7 @@ export async function watchSession(
   }
 
   // Watch session files for changes
-  const usePolling = process.platform === 'win32'
-  const fileWatcher = watch([], {
-    persistent: true,
-    ...(usePolling && { usePolling: true, interval: 500 })
-  })
+  const fileWatcher = watch([], getWatchOptions())
   fileWatcher.on('change', (changedPath: string) => {
     const state = files.get(changedPath)
     if (!state) return
@@ -151,14 +157,12 @@ export async function watchSession(
   // Watch the sessions directory for new session files
   let dirWatcher: FSWatcher | null = null
   try {
-    dirWatcher = watch(SESSIONS_DIR, {
-      persistent: true,
-      depth: 3,
-      ignoreInitial: true
-    })
+    dirWatcher = watch(SESSIONS_DIR, getWatchOptions({ depth: 3, ignoreInitial: true }))
+    if (debug) console.error(`[session-watcher] watching directory ${SESSIONS_DIR} for new session files`)
 
     dirWatcher.on('add', (newPath: string) => {
       if (newPath.endsWith('.jsonl') && newPath.includes('rollout-') && !files.has(newPath)) {
+        if (debug) console.error(`[session-watcher] discovered new session file ${newPath}`)
         // Read from start — new files may already have content when the add event fires
         addFile(newPath, false).then(() => {
           processFile(newPath, files.get(newPath)!)
@@ -187,16 +191,14 @@ export async function watchForFirstSession(
   let sessionWatcher: SessionWatcher | null = null
   let found = false
 
-  const dirWatcher = watch(SESSIONS_DIR, {
-    persistent: true,
-    depth: 3,
-    ignoreInitial: true
-  })
+  const dirWatcher = watch(SESSIONS_DIR, getWatchOptions({ depth: 3, ignoreInitial: true }))
+  if (debug) console.error(`[session-watcher] waiting for first session in ${SESSIONS_DIR}`)
 
   dirWatcher.on('add', async (newPath: string) => {
     if (found) return
     if (newPath.endsWith('.jsonl') && newPath.includes('rollout-')) {
       found = true
+      if (debug) console.error(`[session-watcher] first session discovered: ${newPath}`)
       // Found the first session file - switch to session watching
       await dirWatcher.close()
       sessionWatcher = await watchSession(newPath, onEvent)

@@ -41,7 +41,11 @@ export function startDevCodexWatcher(): void {
     return
   }
 
-  if (debug) console.log(`[codex-watcher] spawning: ${watcherPath}`)
+  if (debug) {
+    console.log(`[codex-watcher] spawning: ${watcherPath}`)
+    console.log(`[codex-watcher] execPath=${process.execPath}`)
+    console.log(`[codex-watcher] CODEX_HOME=${CODEX_HOME}`)
+  }
 
   const child = spawn(process.execPath, [watcherPath], {
     stdio: debug ? ['ignore', 'ignore', 'pipe'] : 'ignore',
@@ -50,19 +54,32 @@ export function startDevCodexWatcher(): void {
 
   if (debug) {
     child.stderr?.on('data', (data: Buffer) => {
-      console.error(`[codex-watcher] ${data.toString().trimEnd()}`)
+      const lines = data.toString()
+        .split(/\r?\n/)
+        .map((line) => line.trimEnd())
+        .filter(Boolean)
+
+      for (const line of lines) {
+        console.error(`[codex-watcher] ${line}`)
+      }
     })
   }
 
   devWatcherProcess = child
 
-  child.once('exit', () => {
+  child.once('spawn', () => {
+    if (debug) console.log('[codex-watcher] child spawned successfully')
+  })
+
+  child.once('exit', (code, signal) => {
+    if (debug) console.log(`[codex-watcher] child exited (code=${code}, signal=${signal})`)
     if (devWatcherProcess === child) {
       devWatcherProcess = null
     }
   })
 
-  child.once('error', () => {
+  child.once('error', (err) => {
+    console.error('[codex-watcher] child process error:', err)
     if (devWatcherProcess === child) {
       devWatcherProcess = null
     }

@@ -12,13 +12,17 @@ import { homedir } from 'os'
 
 export const CODEX_HOME = join(homedir(), '.codex')
 export const SESSIONS_DIR = join(CODEX_HOME, 'sessions')
+const debug = !!process.env.COMPANION_DEBUG
 
 /**
  * Find the latest Codex session file by walking the date-based directory tree.
  * Returns the path to the most recently modified rollout JSONL file, or null.
  */
 export async function findLatestSession(): Promise<string | null> {
-  if (!existsSync(SESSIONS_DIR)) return null
+  if (!existsSync(SESSIONS_DIR)) {
+    if (debug) console.error(`[session-finder] sessions dir missing: ${SESSIONS_DIR}`)
+    return null
+  }
 
   try {
     // Walk year/month/day directories in reverse order to find newest first
@@ -55,13 +59,18 @@ export async function findLatestSession(): Promise<string | null> {
             }
           }
 
-          if (latestFile) return latestFile
+          if (latestFile) {
+            if (debug) console.error(`[session-finder] latest session file: ${latestFile}`)
+            return latestFile
+          }
         }
       }
     }
 
+    if (debug) console.error('[session-finder] no rollout files found')
     return null
   } catch {
+    if (debug) console.error('[session-finder] failed to scan sessions dir')
     return null
   }
 }
