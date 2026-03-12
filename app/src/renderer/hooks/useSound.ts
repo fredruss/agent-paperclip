@@ -21,13 +21,20 @@ export function useSound(state: PetState, isHydrated: boolean, lastUpdateSource:
       return
     }
 
+    let hadRemoteUpdate = false
+
     api.getSoundEnabled().then((enabled) => {
-      enabledRef.current = enabled
+      if (!hadRemoteUpdate) {
+        enabledRef.current = enabled
+      }
     }).catch(() => {
-      enabledRef.current = true
+      if (!hadRemoteUpdate) {
+        enabledRef.current = true
+      }
     })
 
     return api.onSoundChanged((enabled) => {
+      hadRemoteUpdate = true
       enabledRef.current = enabled
     })
   }, [])
