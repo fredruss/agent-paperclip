@@ -4,8 +4,8 @@ import { useStatus, useSound } from './hooks'
 import './App.css'
 
 function App(): ReactNode {
-  const { primary, sessions, sessionCount } = useStatus()
-  useSound(primary.status)
+  const { primary, sessions, sessionCount, isHydrated, lastUpdateSource } = useStatus()
+  useSound(primary.status, isHydrated, lastUpdateSource)
 
   return (
     <div className="app-container">

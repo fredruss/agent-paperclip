@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PetState } from '../../shared/types'
+import type { StatusUpdateSource } from './useStatus'
 import finishSound from '../assets/sounds/finish-notification.wav'
 import popSound from '../assets/sounds/pop-notification.wav'
 
@@ -8,26 +9,25 @@ const sounds: Partial<Record<PetState, string>> = {
   waiting: popSound
 }
 
-export function useSound(state: PetState): void {
+export function useSound(state: PetState, isHydrated: boolean, lastUpdateSource: StatusUpdateSource): void {
   const prevStateRef = useRef<PetState>(state)
   const enabledRef = useRef<boolean | null>(null)
-  const readyRef = useRef(false)
 
   useEffect(() => {
-    window.electronAPI
-      .getSoundEnabled()
-      .then((enabled) => {
-        enabledRef.current = enabled
-      })
-      .catch(() => {
-        enabledRef.current = true
-      })
-    // Mark ready after the first paint — by then the initial getStatus()
-    // hydration has been processed, so any further transitions are live.
-    requestAnimationFrame(() => {
-      readyRef.current = true
+    const api = window.electronAPI
+
+    if (!api) {
+      enabledRef.current = true
+      return
+    }
+
+    api.getSoundEnabled().then((enabled) => {
+      enabledRef.current = enabled
+    }).catch(() => {
+      enabledRef.current = true
     })
-    return window.electronAPI.onSoundChanged((enabled) => {
+
+    return api.onSoundChanged((enabled) => {
       enabledRef.current = enabled
     })
   }, [])
@@ -36,11 +36,11 @@ export function useSound(state: PetState): void {
     const prev = prevStateRef.current
     prevStateRef.current = state
 
-    if (!readyRef.current || enabledRef.current !== true || prev === state) return
+    if (!isHydrated || lastUpdateSource !== 'live' || enabledRef.current !== true || prev === state) return
 
     const src = sounds[state]
     if (src) {
       new Audio(src).play()
     }
-  }, [state])
+  }, [isHydrated, lastUpdateSource, state])
 }

@@ -53,6 +53,8 @@ describe('preload', () => {
     expect(exposedAPI).toHaveProperty('getActivePack')
     expect(exposedAPI).toHaveProperty('showPackMenu')
     expect(exposedAPI).toHaveProperty('onPackChanged')
+    expect(exposedAPI).toHaveProperty('getSoundEnabled')
+    expect(exposedAPI).toHaveProperty('onSoundChanged')
   })
 
   describe('getStatus', () => {
@@ -156,6 +158,18 @@ describe('preload', () => {
     })
   })
 
+  describe('getSoundEnabled', () => {
+    it('invokes get-sound-enabled IPC channel', async () => {
+      mockInvoke.mockResolvedValue(true)
+
+      const getSoundEnabled = exposedAPI.getSoundEnabled as () => Promise<boolean>
+      const result = await getSoundEnabled()
+
+      expect(mockInvoke).toHaveBeenCalledWith('get-sound-enabled')
+      expect(result).toBe(true)
+    })
+  })
+
   describe('onPackChanged', () => {
     it('registers listener on pack-changed channel', () => {
       const callback = vi.fn()
@@ -192,6 +206,42 @@ describe('preload', () => {
       registeredHandler({}, 'new-pack-id')
 
       expect(callback).toHaveBeenCalledWith('new-pack-id')
+    })
+  })
+
+  describe('onSoundChanged', () => {
+    it('registers listener on sound-changed channel', () => {
+      const callback = vi.fn()
+      const onSoundChanged = exposedAPI.onSoundChanged as (cb: (enabled: boolean) => void) => () => void
+
+      onSoundChanged(callback)
+
+      expect(mockOn).toHaveBeenCalledWith('sound-changed', expect.any(Function))
+    })
+
+    it('returns working unsubscribe function', () => {
+      const callback = vi.fn()
+      const onSoundChanged = exposedAPI.onSoundChanged as (cb: (enabled: boolean) => void) => () => void
+
+      const unsubscribe = onSoundChanged(callback)
+
+      expect(typeof unsubscribe).toBe('function')
+
+      unsubscribe()
+
+      expect(mockRemoveListener).toHaveBeenCalledWith('sound-changed', expect.any(Function))
+    })
+
+    it('calls callback with enabled state when event fires', () => {
+      const callback = vi.fn()
+      const onSoundChanged = exposedAPI.onSoundChanged as (cb: (enabled: boolean) => void) => () => void
+
+      onSoundChanged(callback)
+
+      const registeredHandler = mockOn.mock.calls[0][1]
+      registeredHandler({}, false)
+
+      expect(callback).toHaveBeenCalledWith(false)
     })
   })
 })
