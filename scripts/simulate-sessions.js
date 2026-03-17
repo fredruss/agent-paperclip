@@ -34,7 +34,7 @@ async function runSteps(steps) {
         switch (step.type) {
             case 'write':
                 log(step.sessionId, step.source, step.status, step.action);
-                await (0, status_writer_1.writeSessionStatus)(step.sessionId, step.source, step.status, step.action);
+                await writeSession(step);
                 break;
             case 'remove':
                 log(step.sessionId, '', 'REMOVE', '');
@@ -49,6 +49,34 @@ async function runSteps(steps) {
                 break;
         }
     }
+}
+async function readSessionsSnapshot() {
+    try {
+        const raw = await (0, promises_1.readFile)(status_writer_1.SESSIONS_FILE, 'utf-8');
+        return JSON.parse(raw);
+    }
+    catch {
+        return { sessions: {} };
+    }
+}
+async function writeSession(step) {
+    if (!step.ageMs) {
+        await (0, status_writer_1.writeSessionStatus)(step.sessionId, step.source, step.status, step.action);
+        return;
+    }
+    await (0, status_writer_1.ensureStatusDir)();
+    const sessions = await readSessionsSnapshot();
+    const now = Date.now();
+    const activityTime = now - step.ageMs;
+    sessions.sessions[step.sessionId] = {
+        sessionId: step.sessionId,
+        source: step.source,
+        status: step.status,
+        action: step.action,
+        timestamp: sessions.sessions[step.sessionId]?.timestamp ?? activityTime,
+        lastActivity: activityTime
+    };
+    await (0, promises_1.writeFile)(status_writer_1.SESSIONS_FILE, JSON.stringify(sessions, null, 2));
 }
 // ── Scenarios ────────────────────────────────────────────────────────────────
 const scenarios = {
@@ -116,15 +144,12 @@ const scenarios = {
         ],
     },
     'stale-recovery': {
-        description: 'Session with old timestamp + fresh session arrives',
+        description: 'Backdated stale session is ignored until a fresh session arrives',
         steps: [
-            // Write a session, then wait long enough for it to feel stale
-            { type: 'write', sessionId: 'stale1', source: 'claude-code', status: 'working', action: 'Started long ago...' },
-            { type: 'delay', ms: 3000 },
-            // Fresh session arrives while stale one is still present
+            { type: 'write', sessionId: 'stale1', source: 'claude-code', status: 'working', action: 'Started long ago...', ageMs: 31_000 },
+            { type: 'delay', ms: 500 },
             { type: 'write', sessionId: 'fresh1', source: 'codex', status: 'working', action: 'Fresh session here!' },
             { type: 'delay', ms: 2000 },
-            // Stale one finally updates
             { type: 'write', sessionId: 'stale1', source: 'claude-code', status: 'done', action: 'Finally done' },
             { type: 'delay', ms: 500 },
             { type: 'remove', sessionId: 'stale1' },
@@ -214,7 +239,7 @@ async function interactive() {
                     await printSessions();
                     break;
                 case 'clear':
-                    // Remove all known sessions by writing empty file
+                    await (0, status_writer_1.clearSessions)();
                     await (0, status_writer_1.writeStatus)('idle', 'Cleared by simulator');
                     console.log('Cleared.');
                     break;

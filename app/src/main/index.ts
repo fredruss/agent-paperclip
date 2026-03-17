@@ -8,6 +8,7 @@ import type { Status, MultiSessionStatus } from '../shared/types'
 import { startDevCodexWatcher, stopDevCodexWatcher } from './codex-watcher'
 import { createStatusUpdateCoalescer } from './status-update-coalescer'
 import { buildMultiSessionStatus, legacyToMultiSession, normalizeLegacyStatus, type SessionsFileFormat } from './status-state'
+import { getStatusWatchOptions } from './status-watch-options'
 
 const STATUS_DIR = join(homedir(), '.agent-paperclip')
 const STATUS_FILE = join(STATUS_DIR, 'status.json')
@@ -163,12 +164,7 @@ function createWindow(): void {
 function setupStatusWatcher(): void {
   if (debug) console.log(`[status-watcher] watching ${SESSIONS_FILE} and ${STATUS_FILE}`)
 
-  const usePolling = process.platform === 'win32'
-  const watcher = watch([SESSIONS_FILE, STATUS_FILE], {
-    persistent: true,
-    ignoreInitial: false,
-    ...(usePolling && { usePolling: true, interval: 250 })
-  })
+  const watcher = watch([SESSIONS_FILE, STATUS_FILE], getStatusWatchOptions())
 
   watcher.on('add', (filePath: string) => {
     scheduleStatusSend(`add:${filePath}`)

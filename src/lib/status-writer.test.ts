@@ -19,7 +19,7 @@ vi.mock('fs/promises', () => ({
   readFile: mockReadFile
 }))
 
-const { writeStatus, sessionIdFromPath, writeSessionStatus, removeSession } = await import('./status-writer')
+const { writeStatus, sessionIdFromPath, writeSessionStatus, removeSession, clearSessions } = await import('./status-writer')
 
 describe('writeStatus', () => {
   beforeEach(() => {
@@ -228,5 +228,24 @@ describe('removeSession', () => {
 
     const written = JSON.parse(mockWriteFile.mock.calls[0][1] as string)
     expect(written.sessions.keep).toBeDefined()
+  })
+})
+
+describe('clearSessions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockExistsSync.mockReturnValue(true)
+    mockWriteFile.mockResolvedValue(undefined)
+    mockMkdir.mockResolvedValue(undefined)
+  })
+
+  it('writes an empty sessions map', async () => {
+    await clearSessions()
+
+    expect(mockWriteFile).toHaveBeenCalledTimes(1)
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringMatching(/sessions\.json$/),
+      JSON.stringify({ sessions: {} }, null, 2)
+    )
   })
 })

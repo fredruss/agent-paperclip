@@ -68,6 +68,10 @@ async function readSessionsFile(): Promise<SessionsFile> {
   }
 }
 
+async function writeSessionsFile(file: SessionsFile): Promise<void> {
+  await writeFile(SESSIONS_FILE, JSON.stringify(file, null, 2))
+}
+
 export async function writeSessionStatus(
   sessionId: string,
   source: SessionSource,
@@ -90,7 +94,7 @@ export async function writeSessionStatus(
       ...(usage ? { usage } : {})
     }
 
-    await writeFile(SESSIONS_FILE, JSON.stringify(file, null, 2))
+    await writeSessionsFile(file)
   })
 
   writeChain = task.catch(() => {
@@ -107,7 +111,20 @@ export async function removeSession(sessionId: string): Promise<void> {
     const file = await readSessionsFile()
     delete file.sessions[sessionId]
 
-    await writeFile(SESSIONS_FILE, JSON.stringify(file, null, 2))
+    await writeSessionsFile(file)
+  })
+
+  writeChain = task.catch(() => {
+    // noop
+  })
+
+  await task
+}
+
+export async function clearSessions(): Promise<void> {
+  const task = writeChain.then(async () => {
+    await ensureStatusDir()
+    await writeSessionsFile({ sessions: {} })
   })
 
   writeChain = task.catch(() => {

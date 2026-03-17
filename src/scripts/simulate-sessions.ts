@@ -10,10 +10,10 @@
  * Run alongside `npm run dev:debug` in another terminal to observe behavior.
  */
 
-import { writeSessionStatus, removeSession, writeStatus, SESSIONS_FILE } from '../lib/status-writer'
-import { readFile } from 'fs/promises'
+import { writeSessionStatus, removeSession, writeStatus, clearSessions, ensureStatusDir, SESSIONS_FILE } from '../lib/status-writer'
+import { readFile, writeFile } from 'fs/promises'
 import { createInterface } from 'readline'
-import type { PetState, SessionSource } from '../shared/types'
+import type { PetState, SessionSource, SessionsFile } from '../shared/types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,7 @@ interface WriteStep {
   source: SessionSource
   status: PetState
   action: string
+  ageMs?: number
 }
 
 interface RemoveStep {
@@ -68,7 +69,7 @@ async function runSteps(steps: Step[]): Promise<void> {
     switch (step.type) {
       case 'write':
         log(step.sessionId, step.source, step.status, step.action)
-        await writeSessionStatus(step.sessionId, step.source, step.status, step.action)
+        await writeSession(step)
         break
       case 'remove':
         log(step.sessionId, '', 'REMOVE', '')
@@ -83,6 +84,37 @@ async function runSteps(steps: Step[]): Promise<void> {
         break
     }
   }
+}
+
+async function readSessionsSnapshot(): Promise<SessionsFile> {
+  try {
+    const raw = await readFile(SESSIONS_FILE, 'utf-8')
+    return JSON.parse(raw) as SessionsFile
+  } catch {
+    return { sessions: {} }
+  }
+}
+
+async function writeSession(step: WriteStep): Promise<void> {
+  if (!step.ageMs) {
+    await writeSessionStatus(step.sessionId, step.source, step.status, step.action)
+    return
+  }
+
+  await ensureStatusDir()
+  const sessions = await readSessionsSnapshot()
+  const now = Date.now()
+  const activityTime = now - step.ageMs
+  sessions.sessions[step.sessionId] = {
+    sessionId: step.sessionId,
+    source: step.source,
+    status: step.status,
+    action: step.action,
+    timestamp: sessions.sessions[step.sessionId]?.timestamp ?? activityTime,
+    lastActivity: activityTime
+  }
+
+  await writeFile(SESSIONS_FILE, JSON.stringify(sessions, null, 2))
 }
 
 // ── Scenarios ────────────────────────────────────────────────────────────────
@@ -155,15 +187,12 @@ const scenarios: Record<string, { description: string; steps: Step[] }> = {
   },
 
   'stale-recovery': {
-    description: 'Session with old timestamp + fresh session arrives',
+    description: 'Backdated stale session is ignored until a fresh session arrives',
     steps: [
-      // Write a session, then wait long enough for it to feel stale
-      { type: 'write', sessionId: 'stale1', source: 'claude-code', status: 'working', action: 'Started long ago...' },
-      { type: 'delay', ms: 3000 },
-      // Fresh session arrives while stale one is still present
+      { type: 'write', sessionId: 'stale1', source: 'claude-code', status: 'working', action: 'Started long ago...', ageMs: 31_000 },
+      { type: 'delay', ms: 500 },
       { type: 'write', sessionId: 'fresh1', source: 'codex', status: 'working', action: 'Fresh session here!' },
       { type: 'delay', ms: 2000 },
-      // Stale one finally updates
       { type: 'write', sessionId: 'stale1', source: 'claude-code', status: 'done', action: 'Finally done' },
       { type: 'delay', ms: 500 },
       { type: 'remove', sessionId: 'stale1' },
@@ -260,7 +289,7 @@ async function interactive(): Promise<void> {
           await printSessions()
           break
         case 'clear':
-          // Remove all known sessions by writing empty file
+          await clearSessions()
           await writeStatus('idle', 'Cleared by simulator')
           console.log('Cleared.')
           break

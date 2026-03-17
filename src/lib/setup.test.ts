@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ClaudeSettings } from '../shared/types'
 
+const libStatusWriterPattern = /lib[\\/]status-writer\.js$/
+
 // Mock fs before importing the module
 const mockFs = {
   existsSync: vi.fn(),
@@ -242,7 +244,7 @@ describe('runSetupSync', () => {
   it('copies hook and creates settings when no existing settings', () => {
     mockFs.existsSync.mockImplementation((path: string) => {
       if (path === '/source/hook.js') return true
-      if (path.includes('lib/status-writer.js')) return true
+      if (libStatusWriterPattern.test(path)) return true
       return false
     })
 
@@ -262,7 +264,7 @@ describe('runSetupSync', () => {
   it('copies lib/status-writer.js alongside the hook script', () => {
     mockFs.existsSync.mockImplementation((path: string) => {
       if (path === '/source/hooks/status-reporter.js') return true
-      if (path.includes('lib/status-writer.js')) return true
+      if (libStatusWriterPattern.test(path)) return true
       return false
     })
 
@@ -278,8 +280,8 @@ describe('runSetupSync', () => {
       '/dest/hooks/status-reporter.js'
     )
     expect(mockFs.copyFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('lib/status-writer.js'),
-      expect.stringContaining('lib/status-writer.js')
+      expect.stringMatching(libStatusWriterPattern),
+      expect.stringMatching(libStatusWriterPattern)
     )
   })
 
