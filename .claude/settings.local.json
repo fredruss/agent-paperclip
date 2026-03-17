@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/Fred/claude-companion -name \"*mock*\" -o -name \"*stub*\" -o -name \"*fixture*\" 2>/dev/null | head -20)"
+    ]
+  }
+}

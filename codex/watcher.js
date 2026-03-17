@@ -78,7 +78,7 @@ async function startSessionWatching() {
 }
 async function start() {
     if (debug)
-        console.error(`[watcher] starting, SESSIONS_DIR=${session_finder_1.SESSIONS_DIR}`);
+        console.error(`[watcher] starting, platform=${process.platform}, CODEX_HOME=${session_finder_1.CODEX_HOME}, SESSIONS_DIR=${session_finder_1.SESSIONS_DIR}`);
     if ((0, fs_1.existsSync)(session_finder_1.SESSIONS_DIR)) {
         if (debug)
             console.error('[watcher] sessions dir exists');
@@ -91,8 +91,17 @@ async function start() {
             console.error('[watcher] no ~/.codex, exiting');
         process.exit(0);
     }
-    const dirWatcher = (0, chokidar_1.watch)(session_finder_1.CODEX_HOME, { persistent: true, depth: 0, ignoreInitial: true });
+    const dirWatcher = (0, chokidar_1.watch)(session_finder_1.CODEX_HOME, {
+        persistent: true,
+        depth: 0,
+        ignoreInitial: true,
+        ...(process.platform === 'win32' ? { usePolling: true, interval: session_watcher_1.WINDOWS_POLL_INTERVAL_MS } : {})
+    });
+    if (debug)
+        console.error(`[watcher] waiting for sessions dir to appear under ${session_finder_1.CODEX_HOME}`);
     dirWatcher.on('addDir', async (dirPath) => {
+        if (debug)
+            console.error(`[watcher] directory added: ${dirPath}`);
         if (dirPath === session_finder_1.SESSIONS_DIR) {
             await dirWatcher.close();
             await startSessionWatching();

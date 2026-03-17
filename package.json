@@ -16,7 +16,8 @@
     "test": "npm run test:scripts && cd app && npm test",
     "test:run": "npm run test:scripts:run && cd app && npm run test:run",
     "test:scripts": "vitest --config vitest.config.ts",
-    "test:scripts:run": "vitest run --config vitest.config.ts"
+    "test:scripts:run": "vitest run --config vitest.config.ts",
+    "simulate": "npm run build:scripts && node scripts/simulate-sessions.js"
   },
   "files": [
     "README.md",
