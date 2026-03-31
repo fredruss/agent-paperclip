@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const libStatusWriterPattern = /lib[\\/]status-writer\.js$/
+const libStatusWriterPattern = /[^\\/]+[\\/]lib[\\/]status-writer\.js$/
 
 // Mock fs and fs/promises before any imports that might use them
 const mockExistsSync = vi.fn()

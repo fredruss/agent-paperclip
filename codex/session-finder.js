@@ -29,6 +29,8 @@ async function findLatestSession() {
         // Walk year/month/day directories in reverse order to find newest first
         const years = await (0, promises_1.readdir)(exports.SESSIONS_DIR);
         const sortedYears = years.filter(isNumericDir).sort().reverse();
+        let latestFile = null;
+        let latestMtime = 0;
         for (const year of sortedYears) {
             const yearDir = (0, path_1.join)(exports.SESSIONS_DIR, year);
             const months = await (0, promises_1.readdir)(yearDir);
@@ -43,9 +45,6 @@ async function findLatestSession() {
                     const rollouts = files.filter(f => f.startsWith('rollout-') && f.endsWith('.jsonl'));
                     if (rollouts.length === 0)
                         continue;
-                    // Find the most recently modified file in this day directory
-                    let latestFile = null;
-                    let latestMtime = 0;
                     for (const file of rollouts) {
                         const filePath = (0, path_1.join)(dayDir, file);
                         const fileStat = await (0, promises_1.stat)(filePath);
@@ -54,13 +53,13 @@ async function findLatestSession() {
                             latestFile = filePath;
                         }
                     }
-                    if (latestFile) {
-                        if (debug)
-                            console.error(`[session-finder] latest session file: ${latestFile}`);
-                        return latestFile;
-                    }
                 }
             }
+        }
+        if (latestFile) {
+            if (debug)
+                console.error(`[session-finder] latest session file: ${latestFile} (${latestMtime})`);
+            return latestFile;
         }
         if (debug)
             console.error('[session-finder] no rollout files found');
