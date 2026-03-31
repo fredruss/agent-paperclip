@@ -4,6 +4,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const mockExistsSync = vi.fn()
 const mockWriteFile = vi.fn()
 const mockMkdir = vi.fn()
+const mockOpen = vi.fn()
+const mockRename = vi.fn()
+const mockRm = vi.fn()
+const mockStat = vi.fn()
 
 vi.mock('fs', () => ({
   default: { existsSync: mockExistsSync },
@@ -13,20 +17,37 @@ vi.mock('fs', () => ({
 const mockReadFile = vi.fn()
 
 vi.mock('fs/promises', () => ({
-  default: { writeFile: mockWriteFile, mkdir: mockMkdir, readFile: mockReadFile },
+  default: {
+    writeFile: mockWriteFile,
+    mkdir: mockMkdir,
+    readFile: mockReadFile,
+    open: mockOpen,
+    rename: mockRename,
+    rm: mockRm,
+    stat: mockStat
+  },
   writeFile: mockWriteFile,
   mkdir: mockMkdir,
-  readFile: mockReadFile
+  readFile: mockReadFile,
+  open: mockOpen,
+  rename: mockRename,
+  rm: mockRm,
+  stat: mockStat
 }))
 
-const { writeStatus, sessionIdFromPath, writeSessionStatus, removeSession } = await import('./status-writer')
+const { writeStatus, sessionIdFromPath, writeSessionStatus, removeSession, clearSessions } = await import('./status-writer')
 
 describe('writeStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
     mockExistsSync.mockReturnValue(true)
     mockWriteFile.mockResolvedValue(undefined)
     mockMkdir.mockResolvedValue(undefined)
+    mockOpen.mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) })
+    mockRename.mockResolvedValue(undefined)
+    mockRm.mockResolvedValue(undefined)
+    mockStat.mockRejectedValue(new Error('ENOENT'))
   })
 
   afterEach(() => {
@@ -130,16 +151,26 @@ describe('sessionIdFromPath', () => {
 describe('writeSessionStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
     mockExistsSync.mockReturnValue(true)
     mockWriteFile.mockResolvedValue(undefined)
     mockMkdir.mockResolvedValue(undefined)
     mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    mockOpen.mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) })
+    mockRename.mockResolvedValue(undefined)
+    mockRm.mockResolvedValue(undefined)
+    mockStat.mockRejectedValue(new Error('ENOENT'))
   })
 
   it('creates sessions.json with correct structure', async () => {
     await writeSessionStatus('abc123', 'claude-code', 'working', 'Editing index.ts...')
 
     expect(mockWriteFile).toHaveBeenCalledTimes(1)
+    expect(mockOpen).toHaveBeenCalledWith(expect.stringMatching(/sessions\.json\.lock$/), 'wx')
+    expect(mockRename).toHaveBeenCalledWith(
+      expect.stringMatching(/sessions\.json\.\d+\.\d+\.tmp$/),
+      expect.stringMatching(/sessions\.json$/)
+    )
     const written = JSON.parse(mockWriteFile.mock.calls[0][1] as string)
     expect(written.sessions.abc123).toMatchObject({
       sessionId: 'abc123',
@@ -194,14 +225,33 @@ describe('writeSessionStatus', () => {
     const written = JSON.parse(mockWriteFile.mock.calls[0][1] as string)
     expect(written.sessions.s1).toMatchObject({ sessionId: 's1' })
   })
+
+  it('retries until the sessions lock becomes available', async () => {
+    vi.useFakeTimers()
+    mockOpen
+      .mockRejectedValueOnce(Object.assign(new Error('locked'), { code: 'EEXIST' }))
+      .mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) })
+    mockStat.mockResolvedValue({ mtimeMs: Date.now() })
+
+    const writePromise = writeSessionStatus('s1', 'claude-code', 'idle', 'Ready')
+    await vi.advanceTimersByTimeAsync(50)
+    await writePromise
+
+    expect(mockOpen).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('removeSession', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
     mockExistsSync.mockReturnValue(true)
     mockWriteFile.mockResolvedValue(undefined)
     mockMkdir.mockResolvedValue(undefined)
+    mockOpen.mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) })
+    mockRename.mockResolvedValue(undefined)
+    mockRm.mockResolvedValue(undefined)
+    mockStat.mockRejectedValue(new Error('ENOENT'))
   })
 
   it('removes only the target session', async () => {
@@ -228,5 +278,33 @@ describe('removeSession', () => {
 
     const written = JSON.parse(mockWriteFile.mock.calls[0][1] as string)
     expect(written.sessions.keep).toBeDefined()
+  })
+})
+
+describe('clearSessions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useRealTimers()
+    mockExistsSync.mockReturnValue(true)
+    mockWriteFile.mockResolvedValue(undefined)
+    mockMkdir.mockResolvedValue(undefined)
+    mockOpen.mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) })
+    mockRename.mockResolvedValue(undefined)
+    mockRm.mockResolvedValue(undefined)
+    mockStat.mockRejectedValue(new Error('ENOENT'))
+  })
+
+  it('writes an empty sessions map', async () => {
+    await clearSessions()
+
+    expect(mockWriteFile).toHaveBeenCalledTimes(1)
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringMatching(/sessions\.json\.\d+\.\d+\.tmp$/),
+      JSON.stringify({ sessions: {} }, null, 2)
+    )
+    expect(mockRename).toHaveBeenCalledWith(
+      expect.stringMatching(/sessions\.json\.\d+\.\d+\.tmp$/),
+      expect.stringMatching(/sessions\.json$/)
+    )
   })
 })

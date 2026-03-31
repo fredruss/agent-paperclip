@@ -1,0 +1,349 @@
+/**
+ * Multi-session simulator for testing the Electron app's file-watching,
+ * aggregation, and rendering pipeline with fake session data.
+ *
+ * Usage:
+ *   npm run simulate list                    # List available scenarios
+ *   npm run simulate two-sessions            # Run a predefined scenario
+ *   npm run simulate interactive             # Manual control mode
+ *
+ * Run alongside `npm run dev:debug` in another terminal to observe behavior.
+ */
+
+import { writeSessionStatus, removeSession, writeStatus, clearSessions, ensureStatusDir, SESSIONS_FILE } from '../lib/status-writer'
+import { readFile, writeFile } from 'fs/promises'
+import { createInterface } from 'readline'
+import type { PetState, SessionSource, SessionsFile } from '../shared/types'
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const startTime = Date.now()
+
+function timestamp(): string {
+  const elapsed = Date.now() - startTime
+  const mins = Math.floor(elapsed / 60000)
+  const secs = Math.floor((elapsed % 60000) / 1000)
+  const ms = elapsed % 1000
+  return `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(3, '0')}]`
+}
+
+function log(sessionId: string, source: string, status: string, action: string): void {
+  console.log(`${timestamp()} ${sessionId.padEnd(12)} ${source.padEnd(12)} ${status.padEnd(10)} "${action}"`)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// ── Step runner ──────────────────────────────────────────────────────────────
+
+interface WriteStep {
+  type: 'write'
+  sessionId: string
+  source: SessionSource
+  status: PetState
+  action: string
+  ageMs?: number
+}
+
+interface RemoveStep {
+  type: 'remove'
+  sessionId: string
+}
+
+interface DelayStep {
+  type: 'delay'
+  ms: number
+}
+
+interface LegacyWriteStep {
+  type: 'legacy'
+  status: PetState
+  action: string
+}
+
+type Step = WriteStep | RemoveStep | DelayStep | LegacyWriteStep
+
+async function runSteps(steps: Step[]): Promise<void> {
+  for (const step of steps) {
+    switch (step.type) {
+      case 'write':
+        log(step.sessionId, step.source, step.status, step.action)
+        await writeSession(step)
+        break
+      case 'remove':
+        log(step.sessionId, '', 'REMOVE', '')
+        await removeSession(step.sessionId)
+        break
+      case 'legacy':
+        log('(legacy)', '', step.status, step.action)
+        await writeStatus(step.status, step.action)
+        break
+      case 'delay':
+        await sleep(step.ms)
+        break
+    }
+  }
+}
+
+async function readSessionsSnapshot(): Promise<SessionsFile> {
+  try {
+    const raw = await readFile(SESSIONS_FILE, 'utf-8')
+    return JSON.parse(raw) as SessionsFile
+  } catch {
+    return { sessions: {} }
+  }
+}
+
+async function writeSession(step: WriteStep): Promise<void> {
+  if (!step.ageMs) {
+    await writeSessionStatus(step.sessionId, step.source, step.status, step.action)
+    return
+  }
+
+  await ensureStatusDir()
+  const sessions = await readSessionsSnapshot()
+  const now = Date.now()
+  const activityTime = now - step.ageMs
+  sessions.sessions[step.sessionId] = {
+    sessionId: step.sessionId,
+    source: step.source,
+    status: step.status,
+    action: step.action,
+    timestamp: sessions.sessions[step.sessionId]?.timestamp ?? activityTime,
+    lastActivity: activityTime
+  }
+
+  await writeFile(SESSIONS_FILE, JSON.stringify(sessions, null, 2))
+}
+
+// ── Scenarios ────────────────────────────────────────────────────────────────
+
+const scenarios: Record<string, { description: string; steps: Step[] }> = {
+  'two-sessions': {
+    description: 'Basic overlap: Claude starts, Codex joins, Claude finishes, Codex finishes',
+    steps: [
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Reading file.ts...' },
+      { type: 'delay', ms: 1500 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'reading', action: 'Searching codebase...' },
+      { type: 'delay', ms: 1000 },
+      { type: 'write', sessionId: 'codex1', source: 'codex', status: 'working', action: 'Running tests...' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'done', action: 'All done!' },
+      { type: 'delay', ms: 500 },
+      { type: 'remove', sessionId: 'claude1' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'codex1', source: 'codex', status: 'done', action: 'Tests passed!' },
+      { type: 'delay', ms: 500 },
+      { type: 'remove', sessionId: 'codex1' },
+    ],
+  },
+
+  'claude-finishes-first': {
+    description: 'Primary should switch to remaining active Codex session',
+    steps: [
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Editing index.ts...' },
+      { type: 'delay', ms: 1000 },
+      { type: 'write', sessionId: 'codex1', source: 'codex', status: 'working', action: 'Installing dependencies...' },
+      { type: 'delay', ms: 1500 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'done', action: 'Edit complete' },
+      { type: 'delay', ms: 500 },
+      { type: 'remove', sessionId: 'claude1' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'codex1', source: 'codex', status: 'reading', action: 'Analyzing output...' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'codex1', source: 'codex', status: 'done', action: 'All tasks complete' },
+      { type: 'delay', ms: 500 },
+      { type: 'remove', sessionId: 'codex1' },
+    ],
+  },
+
+  'rapid-state-changes': {
+    description: 'Coalescer dedup under rapid writes (100ms intervals)',
+    steps: [
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Step 1' },
+      { type: 'delay', ms: 100 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'reading', action: 'Step 2' },
+      { type: 'delay', ms: 100 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Step 3' },
+      { type: 'delay', ms: 100 },
+      { type: 'write', sessionId: 'codex1', source: 'codex', status: 'working', action: 'Codex step 1' },
+      { type: 'delay', ms: 100 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'reading', action: 'Step 4' },
+      { type: 'delay', ms: 100 },
+      { type: 'write', sessionId: 'codex1', source: 'codex', status: 'reading', action: 'Codex step 2' },
+      { type: 'delay', ms: 100 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Step 5' },
+      { type: 'delay', ms: 100 },
+      { type: 'write', sessionId: 'codex1', source: 'codex', status: 'working', action: 'Codex step 3' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'done', action: 'Done' },
+      { type: 'delay', ms: 100 },
+      { type: 'write', sessionId: 'codex1', source: 'codex', status: 'done', action: 'Done' },
+      { type: 'delay', ms: 500 },
+      { type: 'remove', sessionId: 'claude1' },
+      { type: 'remove', sessionId: 'codex1' },
+    ],
+  },
+
+  'stale-recovery': {
+    description: 'Backdated stale session is ignored until a fresh session arrives',
+    steps: [
+      { type: 'write', sessionId: 'stale1', source: 'claude-code', status: 'working', action: 'Started long ago...', ageMs: 31_000 },
+      { type: 'delay', ms: 500 },
+      { type: 'write', sessionId: 'fresh1', source: 'codex', status: 'working', action: 'Fresh session here!' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'stale1', source: 'claude-code', status: 'done', action: 'Finally done' },
+      { type: 'delay', ms: 500 },
+      { type: 'remove', sessionId: 'stale1' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'fresh1', source: 'codex', status: 'done', action: 'All good' },
+      { type: 'delay', ms: 500 },
+      { type: 'remove', sessionId: 'fresh1' },
+    ],
+  },
+
+  'permission-prompt': {
+    description: 'Claude enters waiting state, then resumes',
+    steps: [
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Writing code...' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'waiting', action: 'Waiting for permission...' },
+      { type: 'delay', ms: 4000 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Permission granted, continuing...' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'done', action: 'Task complete' },
+      { type: 'delay', ms: 500 },
+      { type: 'remove', sessionId: 'claude1' },
+    ],
+  },
+
+  'error-recovery': {
+    description: 'Error state → recovery → done',
+    steps: [
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Running build...' },
+      { type: 'delay', ms: 1500 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'error', action: 'Build failed!' },
+      { type: 'delay', ms: 3000 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Fixing errors...' },
+      { type: 'delay', ms: 2000 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'working', action: 'Retrying build...' },
+      { type: 'delay', ms: 1500 },
+      { type: 'write', sessionId: 'claude1', source: 'claude-code', status: 'done', action: 'Build succeeded!' },
+      { type: 'delay', ms: 500 },
+      { type: 'remove', sessionId: 'claude1' },
+    ],
+  },
+}
+
+// ── Interactive mode ─────────────────────────────────────────────────────────
+
+async function printSessions(): Promise<void> {
+  try {
+    const raw = await readFile(SESSIONS_FILE, 'utf-8')
+    console.log(raw)
+  } catch {
+    console.log('(no sessions file)')
+  }
+}
+
+async function interactive(): Promise<void> {
+  console.log('Interactive mode. Commands:')
+  console.log('  add <id> <claude-code|codex> <state> <action...>')
+  console.log('  remove <id>')
+  console.log('  status')
+  console.log('  clear')
+  console.log('  quit')
+  console.log()
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout })
+
+  const prompt = (): void => {
+    rl.question('> ', async (line) => {
+      const parts = line.trim().split(/\s+/)
+      const cmd = parts[0]
+
+      switch (cmd) {
+        case 'add': {
+          const [, id, source, status, ...rest] = parts
+          if (!id || !source || !status) {
+            console.log('Usage: add <id> <claude-code|codex> <state> <action...>')
+            break
+          }
+          const action = rest.join(' ') || status
+          log(id, source, status, action)
+          await writeSessionStatus(id, source as SessionSource, status as PetState, action)
+          break
+        }
+        case 'remove': {
+          const id = parts[1]
+          if (!id) {
+            console.log('Usage: remove <id>')
+            break
+          }
+          log(id, '', 'REMOVE', '')
+          await removeSession(id)
+          break
+        }
+        case 'status':
+          await printSessions()
+          break
+        case 'clear':
+          await clearSessions()
+          await writeStatus('idle', 'Cleared by simulator')
+          console.log('Cleared.')
+          break
+        case 'quit':
+        case 'exit':
+          rl.close()
+          return
+        case '':
+          break
+        default:
+          console.log(`Unknown command: ${cmd}`)
+      }
+
+      prompt()
+    })
+  }
+
+  prompt()
+}
+
+// ── CLI ──────────────────────────────────────────────────────────────────────
+
+async function main(): Promise<void> {
+  const command = process.argv[2]
+
+  if (!command || command === 'list') {
+    console.log('Available scenarios:\n')
+    for (const [name, scenario] of Object.entries(scenarios)) {
+      console.log(`  ${name.padEnd(25)} ${scenario.description}`)
+    }
+    console.log(`\n  ${'interactive'.padEnd(25)} Manual control mode`)
+    console.log('\nUsage: npm run simulate <scenario>')
+    return
+  }
+
+  if (command === 'interactive') {
+    await interactive()
+    return
+  }
+
+  const scenario = scenarios[command]
+  if (!scenario) {
+    console.error(`Unknown scenario: ${command}`)
+    console.error('Run "npm run simulate list" to see available scenarios.')
+    process.exit(1)
+  }
+
+  console.log(`Running scenario: ${command}`)
+  console.log(`${scenario.description}\n`)
+  await runSteps(scenario.steps)
+  console.log(`\n${timestamp()} Scenario complete.`)
+}
+
+main().catch(err => {
+  console.error(err)
+  process.exit(1)
+})

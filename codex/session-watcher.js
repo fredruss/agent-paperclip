@@ -7,6 +7,8 @@
  * to watching them.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.WINDOWS_POLL_INTERVAL_MS = void 0;
+exports.getWatchOptions = getWatchOptions;
 exports.parseJsonlChunk = parseJsonlChunk;
 exports.watchSession = watchSession;
 exports.watchForFirstSession = watchForFirstSession;
@@ -15,6 +17,14 @@ const chokidar_1 = require("chokidar");
 const session_finder_1 = require("./session-finder");
 const debug = !!process.env.COMPANION_DEBUG;
 const MAX_CHUNK_BYTES = 5 * 1024 * 1024; // 5 MB
+exports.WINDOWS_POLL_INTERVAL_MS = 500;
+function getWatchOptions(extra = {}) {
+    return {
+        persistent: true,
+        ...extra,
+        ...(process.platform === 'win32' ? { usePolling: true, interval: exports.WINDOWS_POLL_INTERVAL_MS } : {})
+    };
+}
 /**
  * Parse a chunk of JSONL text while preserving incomplete trailing lines.
  */
@@ -63,6 +73,8 @@ async function watchSession(sessionFile, onEvent) {
                 offset = 0;
             }
         }
+        if (debug)
+            console.error(`[session-watcher] tracking ${filePath} (skipExisting=${skipExisting}, offset=${offset})`);
         files.set(filePath, { offset, lineRemainder: '', reading: false, dirty: false });
         fileWatcher.add(filePath);
     }
@@ -113,11 +125,7 @@ async function watchSession(sessionFile, onEvent) {
         }
     }
     // Watch session files for changes
-    const usePolling = process.platform === 'win32';
-    const fileWatcher = (0, chokidar_1.watch)([], {
-        persistent: true,
-        ...(usePolling && { usePolling: true, interval: 500 })
-    });
+    const fileWatcher = (0, chokidar_1.watch)([], getWatchOptions());
     fileWatcher.on('change', (changedPath) => {
         const state = files.get(changedPath);
         if (!state)
@@ -131,13 +139,13 @@ async function watchSession(sessionFile, onEvent) {
     // Watch the sessions directory for new session files
     let dirWatcher = null;
     try {
-        dirWatcher = (0, chokidar_1.watch)(session_finder_1.SESSIONS_DIR, {
-            persistent: true,
-            depth: 3,
-            ignoreInitial: true
-        });
+        dirWatcher = (0, chokidar_1.watch)(session_finder_1.SESSIONS_DIR, getWatchOptions({ depth: 3, ignoreInitial: true }));
+        if (debug)
+            console.error(`[session-watcher] watching directory ${session_finder_1.SESSIONS_DIR} for new session files`);
         dirWatcher.on('add', (newPath) => {
             if (newPath.endsWith('.jsonl') && newPath.includes('rollout-') && !files.has(newPath)) {
+                if (debug)
+                    console.error(`[session-watcher] discovered new session file ${newPath}`);
                 // Read from start — new files may already have content when the add event fires
                 addFile(newPath, false).then(() => {
                     processFile(newPath, files.get(newPath));
@@ -163,16 +171,16 @@ async function watchSession(sessionFile, onEvent) {
 async function watchForFirstSession(onEvent) {
     let sessionWatcher = null;
     let found = false;
-    const dirWatcher = (0, chokidar_1.watch)(session_finder_1.SESSIONS_DIR, {
-        persistent: true,
-        depth: 3,
-        ignoreInitial: true
-    });
+    const dirWatcher = (0, chokidar_1.watch)(session_finder_1.SESSIONS_DIR, getWatchOptions({ depth: 3, ignoreInitial: true }));
+    if (debug)
+        console.error(`[session-watcher] waiting for first session in ${session_finder_1.SESSIONS_DIR}`);
     dirWatcher.on('add', async (newPath) => {
         if (found)
             return;
         if (newPath.endsWith('.jsonl') && newPath.includes('rollout-')) {
             found = true;
+            if (debug)
+                console.error(`[session-watcher] first session discovered: ${newPath}`);
             // Found the first session file - switch to session watching
             await dirWatcher.close();
             sessionWatcher = await watchSession(newPath, onEvent);

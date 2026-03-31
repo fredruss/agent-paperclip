@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+const libStatusWriterPattern = /[^\\/]+[\\/]lib[\\/]status-writer\.js$/
+
 // Mock fs and fs/promises before any imports that might use them
 const mockExistsSync = vi.fn()
 const mockWriteFile = vi.fn()
@@ -311,7 +313,7 @@ describe('setupHooks', () => {
         return true
       }
       // Lib source file exists
-      if (path.includes('lib/status-writer.js')) {
+      if (libStatusWriterPattern.test(path)) {
         return true
       }
       return false
@@ -324,7 +326,7 @@ describe('setupHooks', () => {
 
     // Should copy lib/status-writer.js
     expect(mockCopyFile).toHaveBeenCalledWith(
-      expect.stringContaining('lib/status-writer.js'),
+      expect.stringMatching(libStatusWriterPattern),
       join(STATUS_DIR, 'lib', 'status-writer.js')
     )
 

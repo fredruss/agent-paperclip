@@ -33,3 +33,7 @@ app/release/
 # Project instructions
 CLAUDE.md
 AGENTS.md
+
+# Local tool state
+.claude/settings.local.json
+Microsoft/Windows/PowerShell/ModuleAnalysisCache

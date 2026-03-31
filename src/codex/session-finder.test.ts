@@ -66,6 +66,25 @@ describe('findLatestSession', () => {
     expect(result).toContain('rollout-new.jsonl')
   })
 
+  it('keeps scanning all day folders and returns the newest mtime overall', async () => {
+    mockExistsSync.mockReturnValue(true)
+
+    mockReaddir
+      .mockResolvedValueOnce(['2026'])
+      .mockResolvedValueOnce(['02', '01'])
+      .mockResolvedValueOnce(['15'])
+      .mockResolvedValueOnce(['rollout-newer-date.jsonl'])
+      .mockResolvedValueOnce(['31'])
+      .mockResolvedValueOnce(['rollout-older-date-but-newer-mtime.jsonl'])
+
+    mockStat
+      .mockResolvedValueOnce({ mtimeMs: 1000 })
+      .mockResolvedValueOnce({ mtimeMs: 2000 })
+
+    const result = await findLatestSession()
+    expect(result).toContain('rollout-older-date-but-newer-mtime.jsonl')
+  })
+
   it('skips non-numeric directories', async () => {
     mockExistsSync.mockReturnValue(true)
 

@@ -5,7 +5,7 @@
  * Used by both the Claude Code hook reporter and the Codex watcher.
  */
 
-import { writeFile, readFile, mkdir } from 'fs/promises'
+import { writeFile, readFile, mkdir, open, rename, rm, stat } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
@@ -15,6 +15,10 @@ import type { PetState, TokenUsage, Status, SessionSource, SessionsFile } from '
 export const STATUS_DIR = join(homedir(), '.agent-paperclip')
 export const STATUS_FILE = join(STATUS_DIR, 'status.json')
 export const SESSIONS_FILE = join(STATUS_DIR, 'sessions.json')
+const SESSIONS_LOCK_FILE = `${SESSIONS_FILE}.lock`
+const SESSIONS_LOCK_RETRY_MS = 50
+const SESSIONS_LOCK_TIMEOUT_MS = 5_000
+const SESSIONS_LOCK_STALE_MS = 30_000
 let writeChain: Promise<void> = Promise.resolve()
 
 export async function ensureStatusDir(): Promise<void> {
@@ -68,6 +72,81 @@ async function readSessionsFile(): Promise<SessionsFile> {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function isStaleLockFile(): Promise<boolean> {
+  try {
+    const lockStats = await stat(SESSIONS_LOCK_FILE)
+    return Date.now() - lockStats.mtimeMs > SESSIONS_LOCK_STALE_MS
+  } catch {
+    return false
+  }
+}
+
+async function acquireSessionsLock(): Promise<() => Promise<void>> {
+  const deadline = Date.now() + SESSIONS_LOCK_TIMEOUT_MS
+
+  while (true) {
+    try {
+      const handle = await open(SESSIONS_LOCK_FILE, 'wx')
+      await handle.close()
+
+      return async () => {
+        await rm(SESSIONS_LOCK_FILE, { force: true })
+      }
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code !== 'EEXIST') {
+        throw error
+      }
+
+      if (await isStaleLockFile()) {
+        await rm(SESSIONS_LOCK_FILE, { force: true })
+        continue
+      }
+
+      if (Date.now() >= deadline) {
+        throw new Error(`Timed out acquiring sessions lock: ${SESSIONS_LOCK_FILE}`)
+      }
+
+      await sleep(SESSIONS_LOCK_RETRY_MS)
+    }
+  }
+}
+
+async function writeSessionsFile(file: SessionsFile): Promise<void> {
+  const tempFile = `${SESSIONS_FILE}.${process.pid}.${Date.now()}.tmp`
+  let renamed = false
+
+  try {
+    await writeFile(tempFile, JSON.stringify(file, null, 2))
+    await rename(tempFile, SESSIONS_FILE)
+    renamed = true
+  } finally {
+    if (!renamed) {
+      await rm(tempFile, { force: true }).catch(() => {
+        // noop
+      })
+    }
+  }
+}
+
+async function updateSessionsFile(
+  update: (file: SessionsFile) => void
+): Promise<void> {
+  const releaseLock = await acquireSessionsLock()
+
+  try {
+    const file = await readSessionsFile()
+    update(file)
+    await writeSessionsFile(file)
+  } finally {
+    await releaseLock()
+  }
+}
+
 export async function writeSessionStatus(
   sessionId: string,
   source: SessionSource,
@@ -77,20 +156,18 @@ export async function writeSessionStatus(
 ): Promise<void> {
   const task = writeChain.then(async () => {
     await ensureStatusDir()
-
-    const file = await readSessionsFile()
-    const now = Date.now()
-    file.sessions[sessionId] = {
-      sessionId,
-      source,
-      status,
-      action,
-      timestamp: file.sessions[sessionId]?.timestamp ?? now,
-      lastActivity: now,
-      ...(usage ? { usage } : {})
-    }
-
-    await writeFile(SESSIONS_FILE, JSON.stringify(file, null, 2))
+    await updateSessionsFile((file) => {
+      const now = Date.now()
+      file.sessions[sessionId] = {
+        sessionId,
+        source,
+        status,
+        action,
+        timestamp: file.sessions[sessionId]?.timestamp ?? now,
+        lastActivity: now,
+        ...(usage ? { usage } : {})
+      }
+    })
   })
 
   writeChain = task.catch(() => {
@@ -103,11 +180,24 @@ export async function writeSessionStatus(
 export async function removeSession(sessionId: string): Promise<void> {
   const task = writeChain.then(async () => {
     await ensureStatusDir()
+    await updateSessionsFile((file) => {
+      delete file.sessions[sessionId]
+    })
+  })
 
-    const file = await readSessionsFile()
-    delete file.sessions[sessionId]
+  writeChain = task.catch(() => {
+    // noop
+  })
 
-    await writeFile(SESSIONS_FILE, JSON.stringify(file, null, 2))
+  await task
+}
+
+export async function clearSessions(): Promise<void> {
+  const task = writeChain.then(async () => {
+    await ensureStatusDir()
+    await updateSessionsFile((file) => {
+      file.sessions = {}
+    })
   })
 
   writeChain = task.catch(() => {

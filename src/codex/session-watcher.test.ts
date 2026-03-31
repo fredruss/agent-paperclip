@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest'
-import { parseJsonlChunk } from './session-watcher'
+import { describe, it, expect, afterEach } from 'vitest'
+import { parseJsonlChunk, getWatchOptions } from './session-watcher'
 import type { CodexRolloutEntry } from './types'
 
 function event(type: string, payload: Record<string, unknown>): CodexRolloutEntry {
@@ -10,6 +10,12 @@ function event(type: string, payload: Record<string, unknown>): CodexRolloutEntr
     payload: payload as CodexRolloutEntry['payload']
   }
 }
+
+const originalPlatform = process.platform
+
+afterEach(() => {
+  Object.defineProperty(process, 'platform', { value: originalPlatform })
+})
 
 describe('parseJsonlChunk', () => {
   it('parses complete newline-delimited JSON entries', () => {
@@ -60,5 +66,28 @@ describe('parseJsonlChunk', () => {
     expect(result.entries).toHaveLength(1)
     expect((result.entries[0].payload as { type?: string }).type).toBe('user_message')
     expect(result.remainder).toBe('')
+  })
+})
+
+describe('getWatchOptions', () => {
+  it('enables polling on Windows watchers', () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+
+    expect(getWatchOptions({ depth: 3, ignoreInitial: true })).toEqual({
+      persistent: true,
+      depth: 3,
+      ignoreInitial: true,
+      usePolling: true,
+      interval: 500
+    })
+  })
+
+  it('preserves non-Windows watcher options without polling', () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+
+    expect(getWatchOptions({ depth: 1 })).toEqual({
+      persistent: true,
+      depth: 1
+    })
   })
 })
