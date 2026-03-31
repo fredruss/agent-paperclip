@@ -64,6 +64,8 @@ The pet window will appear and float on top of other windows. It automatically u
 
 The pet also displays the context window usage (input + cache tokens from the latest API call).
 
+It can also play a sound when the agent needs input (`Waiting`) or finishes (`Done`). This can be turned off from the pet's menu.
+
 <img src="app/resources/agent-paperclip-all-stickers.png" width="800" alt="Screenshot of all Agent Paperclip stickers">
 
 3 sticker packs available.
@@ -73,7 +75,7 @@ The pet also displays the context window usage (input + cache tokens from the la
 ### Controls
 
 - **Drag** - Click and drag the pet to move it around your screen
-- **Right-click** - Change sticker pack (2 packs currently available + basic SVG pack)
+- **Right-click** - Open the pet menu to change sticker pack or toggle sound notifications
 
 ## How It Works
 
