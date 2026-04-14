@@ -4,7 +4,7 @@ import { watch } from 'chokidar'
 import { readFile, mkdir, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
-import type { Status, MultiSessionStatus } from '../shared/types'
+import type { Status, MultiSessionStatus, UsageInfo } from '../shared/types'
 import { startDevCodexWatcher, stopDevCodexWatcher } from './codex-watcher'
 import { createStatusUpdateCoalescer } from './status-update-coalescer'
 import { buildMultiSessionStatus, legacyToMultiSession, normalizeLegacyStatus, type SessionsFileFormat } from './status-state'
@@ -14,8 +14,10 @@ const STATUS_DIR = join(homedir(), '.agent-paperclip')
 const STATUS_FILE = join(STATUS_DIR, 'status.json')
 const SESSIONS_FILE = join(STATUS_DIR, 'sessions.json')
 const SETTINGS_FILE = join(STATUS_DIR, 'settings.json')
+const USAGE_FILE = join(STATUS_DIR, 'usage.json')
 const debug = !!process.env.COMPANION_DEBUG
 const STATUS_WATCH_DEBOUNCE_MS = 75
+const USAGE_STALE_AFTER_SECONDS = 6 * 60 * 60
 
 let mainWindow: BrowserWindow | null = null
 
@@ -63,6 +65,31 @@ async function readMultiSessionStatus(): Promise<MultiSessionStatus> {
     if (debug) console.log('[status-reader] sessions.json unavailable, falling back to legacy status.json')
     // Fall back to legacy status.json
     return legacyToMultiSession(await readLegacyStatus())
+  }
+}
+
+async function readUsage(): Promise<UsageInfo | null> {
+  try {
+    const content = await readFile(USAGE_FILE, 'utf-8')
+    const parsed = JSON.parse(content) as Partial<UsageInfo>
+    if (
+      typeof parsed.usedPercentage !== 'number' ||
+      typeof parsed.resetsAt !== 'number' ||
+      typeof parsed.updatedAt !== 'number'
+    ) {
+      return null
+    }
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    if (nowSeconds - parsed.updatedAt > USAGE_STALE_AFTER_SECONDS) {
+      return null
+    }
+    return {
+      usedPercentage: parsed.usedPercentage,
+      resetsAt: parsed.resetsAt,
+      updatedAt: parsed.updatedAt
+    }
+  } catch {
+    return null
   }
 }
 
@@ -177,6 +204,19 @@ function setupStatusWatcher(): void {
   })
 }
 
+function setupUsageWatcher(): void {
+  if (debug) console.log(`[usage-watcher] watching ${USAGE_FILE}`)
+
+  const watcher = watch(USAGE_FILE, getStatusWatchOptions())
+
+  watcher.on('add', () => scheduleUsageSend('add'))
+  watcher.on('change', () => scheduleUsageSend('change'))
+  watcher.on('unlink', () => scheduleUsageSend('unlink'))
+  watcher.on('error', (err) => {
+    console.error('[usage-watcher] error:', err)
+  })
+}
+
 function formatStatusSummary(status: MultiSessionStatus): string {
   const summary = status.sessions.map((session) => `${session.source}:${session.status}:${session.sessionId}`).join(', ')
   return `${status.primary.status} - ${status.primary.action} (${status.sessionCount} sessions)${summary ? ` [${summary}]` : ''}`
@@ -201,6 +241,25 @@ function scheduleStatusSend(reason: string): void {
   statusUpdateCoalescer.schedule(reason)
 }
 
+const usageUpdateCoalescer = createStatusUpdateCoalescer<UsageInfo | null>({
+  delayMs: STATUS_WATCH_DEBOUNCE_MS,
+  load: readUsage,
+  emit: (usage) => {
+    if (!mainWindow) return
+    mainWindow.webContents.send('usage-update', usage)
+  },
+  onSend: (usage, reasons) => {
+    if (debug) console.log(`[usage-watcher] sending from ${reasons.join(', ')}: ${usage ? `${usage.usedPercentage}% resets ${usage.resetsAt}` : 'null'}`)
+  },
+  onSkip: (_usage, reasons) => {
+    if (debug) console.log(`[usage-watcher] skipping duplicate update from ${reasons.join(', ')}`)
+  }
+})
+
+function scheduleUsageSend(reason: string): void {
+  usageUpdateCoalescer.schedule(reason)
+}
+
 // IPC handlers
 ipcMain.handle('get-status', async () => {
   return await readMultiSessionStatus()
@@ -212,6 +271,10 @@ ipcMain.handle('get-active-pack', () => {
 
 ipcMain.handle('get-sound-enabled', () => {
   return soundEnabled
+})
+
+ipcMain.handle('get-usage', async () => {
+  return await readUsage()
 })
 
 // Programmatic drag state
@@ -245,6 +308,7 @@ app.whenReady().then(async () => {
   await loadSettings()
   createWindow()
   setupStatusWatcher()
+  setupUsageWatcher()
 
   // Set custom dock icon on macOS
   if (process.platform === 'darwin') {
@@ -256,7 +320,10 @@ app.whenReady().then(async () => {
   }
 
   // Send initial status
-  setTimeout(() => scheduleStatusSend('initial'), 1000)
+  setTimeout(() => {
+    scheduleStatusSend('initial')
+    scheduleUsageSend('initial')
+  }, 1000)
 })
 
 app.on('window-all-closed', () => {
@@ -273,5 +340,6 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   statusUpdateCoalescer.cancel()
+  usageUpdateCoalescer.cancel()
   stopDevCodexWatcher()
 })

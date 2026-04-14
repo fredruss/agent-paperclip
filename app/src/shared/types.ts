@@ -42,6 +42,8 @@ export type UsageCallback = (usage: UsageInfo | null) => void
 export interface ElectronAPI {
   getStatus: () => Promise<MultiSessionStatus>
   onStatusUpdate: (callback: MultiSessionCallback) => () => void
+  getUsage: () => Promise<UsageInfo | null>
+  onUsageUpdate: (callback: UsageCallback) => () => void
   dragStart: (x: number, y: number) => void
   dragMove: (x: number, y: number) => void
   dragEnd: () => void

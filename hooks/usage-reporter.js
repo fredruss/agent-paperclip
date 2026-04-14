@@ -51,6 +51,14 @@ function writeUsageAtomically(snapshot) {
     fs_1.default.writeFileSync(tmp, JSON.stringify(snapshot));
     fs_1.default.renameSync(tmp, USAGE_FILE);
 }
+function clearUsage() {
+    try {
+        fs_1.default.rmSync(USAGE_FILE, { force: true });
+    }
+    catch {
+        // Best-effort: never fail the statusLine
+    }
+}
 function readWrappedStatusLine() {
     try {
         if (!fs_1.default.existsSync(WRAPPED_FILE))
@@ -107,6 +115,12 @@ async function main() {
                 catch {
                     // Swallow write errors — never fail the statusLine
                 }
+            }
+            else {
+                // Successful parse but no five_hour data: clear any stale snapshot
+                // so a previous session's badge doesn't linger on free tier or
+                // before the first Claude response of a new session.
+                clearUsage();
             }
         }
         catch {

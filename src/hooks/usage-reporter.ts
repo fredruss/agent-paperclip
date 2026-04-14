@@ -67,6 +67,14 @@ function writeUsageAtomically(snapshot: UsageSnapshot): void {
   fs.renameSync(tmp, USAGE_FILE)
 }
 
+function clearUsage(): void {
+  try {
+    fs.rmSync(USAGE_FILE, { force: true })
+  } catch {
+    // Best-effort: never fail the statusLine
+  }
+}
+
 function readWrappedStatusLine(): StatusLineConfig | null {
   try {
     if (!fs.existsSync(WRAPPED_FILE)) return null
@@ -121,6 +129,11 @@ export async function main(): Promise<void> {
         } catch {
           // Swallow write errors — never fail the statusLine
         }
+      } else {
+        // Successful parse but no five_hour data: clear any stale snapshot
+        // so a previous session's badge doesn't linger on free tier or
+        // before the first Claude response of a new session.
+        clearUsage()
       }
     } catch {
       // Malformed stdin — continue so a wrapped statusLine still runs

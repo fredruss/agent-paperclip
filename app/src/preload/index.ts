@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { MultiSessionStatus, MultiSessionCallback, PackCallback } from '../shared/types'
+import type {
+  MultiSessionStatus,
+  MultiSessionCallback,
+  PackCallback,
+  UsageInfo,
+  UsageCallback
+} from '../shared/types'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getStatus: (): Promise<MultiSessionStatus> => ipcRenderer.invoke('get-status'),
@@ -10,6 +16,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('status-update', handler)
     return () => {
       ipcRenderer.removeListener('status-update', handler)
+    }
+  },
+  getUsage: (): Promise<UsageInfo | null> => ipcRenderer.invoke('get-usage'),
+  onUsageUpdate: (callback: UsageCallback): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, usage: UsageInfo | null): void => {
+      callback(usage)
+    }
+    ipcRenderer.on('usage-update', handler)
+    return () => {
+      ipcRenderer.removeListener('usage-update', handler)
     }
   },
   dragStart: (x: number, y: number): void => {

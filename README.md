@@ -64,6 +64,15 @@ The pet window will appear and float on top of other windows. It automatically u
 
 The pet also displays the context window usage (input + cache tokens from the latest API call).
 
+### Usage badge
+
+When the agent is idle, a small badge like `42% · 3h` shows how much of the Claude.ai 5-hour session window is used and how long until it resets. A few notes:
+
+- Pro/Max plans only — free-tier sessions don't expose this data.
+- Powered by a Claude Code statusLine script installed automatically by `agent-paperclip setup`. Any pre-existing statusLine you had is preserved and still rendered.
+- The badge only appears when the pet is idle (so it never competes with live activity).
+- Data becomes available after the first Claude API response in a session, so expect a brief delay on fresh installs.
+
 It can also play a sound when the agent needs input (`Waiting`) or finishes (`Done`). This can be turned off from the pet's menu.
 
 <img src="app/resources/agent-paperclip-all-stickers.png" width="800" alt="Screenshot of all Agent Paperclip stickers">
