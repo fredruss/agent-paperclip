@@ -71,8 +71,15 @@ export interface HooksConfig {
   [key: string]: HookEntry[] | undefined
 }
 
+export interface StatusLineConfig {
+  type: 'command'
+  command: string
+  padding?: number
+}
+
 export interface ClaudeSettings {
   hooks?: HooksConfig
+  statusLine?: StatusLineConfig
   [key: string]: unknown
 }
 

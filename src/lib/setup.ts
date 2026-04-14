@@ -9,19 +9,25 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import readline from 'readline'
-import type { HookEntry, HooksConfig, ClaudeSettings } from '../shared/types'
+import type { HookEntry, HooksConfig, ClaudeSettings, StatusLineConfig } from '../shared/types'
 
 const HOME = os.homedir()
 export const COMPANION_DIR = path.join(HOME, '.agent-paperclip')
 export const COMPANION_HOOKS_DIR = path.join(COMPANION_DIR, 'hooks')
+export const WRAPPED_STATUSLINE_FILE = path.join(COMPANION_DIR, 'wrapped-statusline.json')
 export const CLAUDE_DIR = path.join(HOME, '.claude')
 export const SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json')
+
+export const USAGE_REPORTER_FILENAME = 'usage-reporter.js'
 
 export interface SetupDeps {
   fs?: typeof fs
   readline?: typeof readline
   hookSourcePath?: string
   hookDestPath?: string
+  usageReporterSourcePath?: string
+  usageReporterDestPath?: string
+  wrappedStatusLinePath?: string
   settingsPath?: string
 }
 
@@ -120,6 +126,41 @@ export function writeSettings(
   fsModule.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
 }
 
+export function isOurStatusLine(config: StatusLineConfig | undefined): boolean {
+  if (!config?.command) return false
+  return config.command.includes(USAGE_REPORTER_FILENAME)
+}
+
+export function mergeStatusLine(
+  settings: ClaudeSettings,
+  usageReporterDestPath: string,
+  wrappedStatusLinePath: string,
+  deps?: SetupDeps
+): ClaudeSettings {
+  const fsModule = getFs(deps)
+  const ourCommand = `node "${usageReporterDestPath}"`
+  const result = { ...settings }
+  const existing = result.statusLine
+
+  if (!existing) {
+    // No pre-existing statusLine — drop any stale wrapper left behind by a
+    // previous install that the user has since manually unset, so the runtime
+    // script doesn't forward to a command the user no longer wants.
+    if (fsModule.existsSync(wrappedStatusLinePath)) {
+      fsModule.unlinkSync(wrappedStatusLinePath)
+    }
+  } else if (!isOurStatusLine(existing)) {
+    ensureDir(path.dirname(wrappedStatusLinePath), deps)
+    fsModule.writeFileSync(wrappedStatusLinePath, JSON.stringify(existing, null, 2))
+  }
+
+  // Preserve any extra fields the user had set (e.g. `padding`) so installing
+  // Agent Paperclip doesn't silently regress their statusLine appearance.
+  const preserved = existing ?? {}
+  result.statusLine = { ...preserved, type: 'command', command: ourCommand }
+  return result
+}
+
 export interface SetupResult {
   success: boolean
   hookPath?: string
@@ -132,31 +173,38 @@ export function runSetupSync(deps?: SetupDeps): SetupResult {
   const fsModule = getFs(deps)
   const sourcePath = deps?.hookSourcePath ?? path.join(__dirname, '..', 'hooks', 'status-reporter.js')
   const destPath = deps?.hookDestPath ?? path.join(COMPANION_HOOKS_DIR, 'status-reporter.js')
+  const usageReporterSourcePath =
+    deps?.usageReporterSourcePath ?? path.join(path.dirname(sourcePath), USAGE_REPORTER_FILENAME)
+  const usageReporterDestPath =
+    deps?.usageReporterDestPath ?? path.join(COMPANION_HOOKS_DIR, USAGE_REPORTER_FILENAME)
+  const wrappedStatusLinePath = deps?.wrappedStatusLinePath ?? WRAPPED_STATUSLINE_FILE
   const settingsPath = deps?.settingsPath ?? SETTINGS_FILE
 
-  // Verify source exists
+  // Pre-flight: verify every source file exists before we touch disk.
+  // Copying first and checking later would leave ~/.agent-paperclip in a
+  // partially installed state if a later source is missing.
+  const libSourcePath = path.join(path.dirname(sourcePath), '..', 'lib', 'status-writer.js')
   if (!fsModule.existsSync(sourcePath)) {
-    return {
-      success: false,
-      error: `Hook source not found: ${sourcePath}`
-    }
+    return { success: false, error: `Hook source not found: ${sourcePath}` }
+  }
+  if (!fsModule.existsSync(libSourcePath)) {
+    return { success: false, error: `Lib source not found: ${libSourcePath}` }
+  }
+  if (!fsModule.existsSync(usageReporterSourcePath)) {
+    return { success: false, error: `Usage reporter source not found: ${usageReporterSourcePath}` }
   }
 
   // Copy hook script
   copyHookScript(sourcePath, destPath, deps)
 
   // Copy lib/status-writer.js (required by the hook script)
-  const libSourcePath = path.join(path.dirname(sourcePath), '..', 'lib', 'status-writer.js')
-  if (!fsModule.existsSync(libSourcePath)) {
-    return {
-      success: false,
-      error: `Lib source not found: ${libSourcePath}`
-    }
-  }
   const libDestDir = path.join(COMPANION_DIR, 'lib')
   const libDestPath = path.join(libDestDir, 'status-writer.js')
   ensureDir(libDestDir, deps)
   fsModule.copyFileSync(libSourcePath, libDestPath)
+
+  // Copy usage-reporter.js (statusLine script)
+  copyHookScript(usageReporterSourcePath, usageReporterDestPath, deps)
 
   // Read existing settings
   let settings: ClaudeSettings = {}
@@ -176,7 +224,15 @@ export function runSetupSync(deps?: SetupDeps): SetupResult {
 
   // Merge hooks
   const newHooks = createHookConfig(destPath)
-  const updatedSettings = mergeHooks(settings, newHooks)
+  let updatedSettings = mergeHooks(settings, newHooks)
+
+  // Merge statusLine (preserves any pre-existing statusLine via wrapped-statusline.json)
+  updatedSettings = mergeStatusLine(
+    updatedSettings,
+    usageReporterDestPath,
+    wrappedStatusLinePath,
+    deps
+  )
 
   // Write settings
   writeSettings(settingsPath, updatedSettings, deps)

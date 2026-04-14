@@ -10,7 +10,8 @@ const mockFs = {
   mkdirSync: vi.fn(),
   copyFileSync: vi.fn(),
   readFileSync: vi.fn(),
-  writeFileSync: vi.fn()
+  writeFileSync: vi.fn(),
+  unlinkSync: vi.fn()
 }
 
 vi.mock('fs', () => ({
@@ -27,6 +28,8 @@ const {
   readSettings,
   createBackup,
   mergeHooks,
+  mergeStatusLine,
+  isOurStatusLine,
   writeSettings,
   runSetupSync
 } = await import('./setup')
@@ -243,9 +246,31 @@ describe('runSetupSync', () => {
     expect(result.error).toContain('Hook source not found')
   })
 
+  it('does not copy anything if usage-reporter source is missing (no partial install)', () => {
+    mockFs.existsSync.mockImplementation((p: string) => {
+      if (p === '/source/hooks/status-reporter.js') return true
+      if (libStatusWriterPattern.test(p)) return true
+      // usage-reporter source is deliberately missing
+      return false
+    })
+
+    const result = runSetupSync({
+      hookSourcePath: '/source/hooks/status-reporter.js',
+      hookDestPath: '/dest/hooks/status-reporter.js',
+      settingsPath: '/path/to/settings.json'
+    })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('Usage reporter source not found')
+    // Critically: nothing was written to disk, so ~/.agent-paperclip stays clean
+    expect(mockFs.copyFileSync).not.toHaveBeenCalled()
+    expect(mockFs.writeFileSync).not.toHaveBeenCalled()
+  })
+
   it('copies hook and creates settings when no existing settings', () => {
     mockFs.existsSync.mockImplementation((path: string) => {
       if (path === '/source/hooks/hook.js') return true
+      if (path === '/source/hooks/usage-reporter.js') return true
       if (libStatusWriterPattern.test(path)) return true
       return false
     })
@@ -266,6 +291,7 @@ describe('runSetupSync', () => {
   it('copies lib/status-writer.js alongside the hook script', () => {
     mockFs.existsSync.mockImplementation((path: string) => {
       if (path === '/source/hooks/status-reporter.js') return true
+      if (path === '/source/hooks/usage-reporter.js') return true
       if (libStatusWriterPattern.test(path)) return true
       return false
     })
@@ -319,5 +345,192 @@ describe('runSetupSync', () => {
     expect(mockFs.writeFileSync).toHaveBeenCalled()
     const writtenContent = mockFs.writeFileSync.mock.calls[0][1]
     expect(writtenContent).toContain('"hooks"')
+  })
+})
+
+describe('isOurStatusLine', () => {
+  it('recognizes our usage-reporter command', () => {
+    expect(
+      isOurStatusLine({ type: 'command', command: 'node "/home/user/.agent-paperclip/hooks/usage-reporter.js"' })
+    ).toBe(true)
+  })
+
+  it('does not recognize unrelated statusLine commands', () => {
+    expect(isOurStatusLine({ type: 'command', command: 'my-status-script.sh' })).toBe(false)
+  })
+
+  it('handles undefined/empty configs', () => {
+    expect(isOurStatusLine(undefined)).toBe(false)
+    expect(isOurStatusLine({ type: 'command', command: '' })).toBe(false)
+  })
+})
+
+describe('mergeStatusLine', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('sets our statusLine when none exists, without writing a wrapper file', () => {
+    mockFs.existsSync.mockReturnValue(true)
+
+    const result = mergeStatusLine({}, '/dest/usage-reporter.js', '/wrapped.json')
+
+    expect(result.statusLine).toEqual({
+      type: 'command',
+      command: 'node "/dest/usage-reporter.js"'
+    })
+    expect(mockFs.writeFileSync).not.toHaveBeenCalled()
+  })
+
+  it('preserves a pre-existing statusLine via the wrapper file', () => {
+    mockFs.existsSync.mockReturnValue(true)
+
+    const existing = { type: 'command' as const, command: 'my-status-script.sh' }
+    const result = mergeStatusLine(
+      { statusLine: existing },
+      '/dest/usage-reporter.js',
+      '/wrapped.json'
+    )
+
+    expect(mockFs.writeFileSync).toHaveBeenCalledWith('/wrapped.json', JSON.stringify(existing, null, 2))
+    expect(result.statusLine?.command).toBe('node "/dest/usage-reporter.js"')
+  })
+
+  it('does not double-wrap when our statusLine is already set', () => {
+    mockFs.existsSync.mockReturnValue(true)
+
+    const ours = { type: 'command' as const, command: 'node "/dest/usage-reporter.js"' }
+    const result = mergeStatusLine(
+      { statusLine: ours },
+      '/dest/usage-reporter.js',
+      '/wrapped.json'
+    )
+
+    expect(mockFs.writeFileSync).not.toHaveBeenCalled()
+    expect(result.statusLine).toEqual(ours)
+  })
+
+  it('preserves padding (and other fields) from a pre-existing statusLine', () => {
+    mockFs.existsSync.mockReturnValue(true)
+
+    const existing = { type: 'command' as const, command: 'my-status.sh', padding: 2 }
+    const result = mergeStatusLine(
+      { statusLine: existing },
+      '/dest/usage-reporter.js',
+      '/wrapped.json'
+    )
+
+    expect(result.statusLine).toEqual({
+      type: 'command',
+      command: 'node "/dest/usage-reporter.js"',
+      padding: 2
+    })
+  })
+
+  it('removes a stale wrapper file when no pre-existing statusLine is set', () => {
+    // Wrapper exists from a previous install, but settings no longer has statusLine
+    mockFs.existsSync.mockImplementation((p: string) => p === '/wrapped.json')
+
+    mergeStatusLine({}, '/dest/usage-reporter.js', '/wrapped.json')
+
+    expect(mockFs.unlinkSync).toHaveBeenCalledWith('/wrapped.json')
+    expect(mockFs.writeFileSync).not.toHaveBeenCalled()
+  })
+
+  it('does not attempt to remove a wrapper file that does not exist', () => {
+    mockFs.existsSync.mockReturnValue(false)
+
+    mergeStatusLine({}, '/dest/usage-reporter.js', '/wrapped.json')
+
+    expect(mockFs.unlinkSync).not.toHaveBeenCalled()
+  })
+})
+
+describe('runSetupSync statusLine wiring', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('installs our statusLine when none pre-exists', () => {
+    mockFs.existsSync.mockImplementation((p: string) => {
+      if (p === '/source/hooks/status-reporter.js') return true
+      if (p === '/source/hooks/usage-reporter.js') return true
+      if (libStatusWriterPattern.test(p)) return true
+      return false
+    })
+
+    runSetupSync({
+      hookSourcePath: '/source/hooks/status-reporter.js',
+      hookDestPath: '/dest/hooks/status-reporter.js',
+      usageReporterDestPath: '/dest/hooks/usage-reporter.js',
+      wrappedStatusLinePath: '/dest/wrapped-statusline.json',
+      settingsPath: '/path/to/settings.json'
+    })
+
+    // settings.json write is the last writeFileSync call; no wrapper should have been written
+    const writes = mockFs.writeFileSync.mock.calls
+    expect(writes.some(([p]) => p === '/dest/wrapped-statusline.json')).toBe(false)
+    const settingsWrite = writes.find(([p]) => p === '/path/to/settings.json')
+    expect(settingsWrite).toBeDefined()
+    const parsed = JSON.parse(settingsWrite![1] as string) as ClaudeSettings
+    expect(parsed.statusLine).toEqual({
+      type: 'command',
+      command: 'node "/dest/hooks/usage-reporter.js"'
+    })
+  })
+
+  it('preserves a pre-existing statusLine via wrapped-statusline.json', () => {
+    mockFs.existsSync.mockImplementation((p: string) => {
+      if (p === '/source/hooks/status-reporter.js') return true
+      if (p === '/source/hooks/usage-reporter.js') return true
+      if (libStatusWriterPattern.test(p)) return true
+      if (p === '/path/to/settings.json') return true
+      return false
+    })
+    const existing = { type: 'command', command: 'my-status-script.sh' }
+    mockFs.readFileSync.mockReturnValue(JSON.stringify({ statusLine: existing }))
+
+    runSetupSync({
+      hookSourcePath: '/source/hooks/status-reporter.js',
+      hookDestPath: '/dest/hooks/status-reporter.js',
+      usageReporterDestPath: '/dest/hooks/usage-reporter.js',
+      wrappedStatusLinePath: '/dest/wrapped-statusline.json',
+      settingsPath: '/path/to/settings.json'
+    })
+
+    const writes = mockFs.writeFileSync.mock.calls
+    const wrapperWrite = writes.find(([p]) => p === '/dest/wrapped-statusline.json')
+    expect(wrapperWrite).toBeDefined()
+    expect(JSON.parse(wrapperWrite![1] as string)).toEqual(existing)
+
+    const settingsWrite = writes.find(([p]) => p === '/path/to/settings.json')
+    const parsed = JSON.parse(settingsWrite![1] as string) as ClaudeSettings
+    expect(parsed.statusLine?.command).toBe('node "/dest/hooks/usage-reporter.js"')
+  })
+
+  it('does not double-wrap on re-run when our statusLine is already installed', () => {
+    mockFs.existsSync.mockImplementation((p: string) => {
+      if (p === '/source/hooks/status-reporter.js') return true
+      if (p === '/source/hooks/usage-reporter.js') return true
+      if (libStatusWriterPattern.test(p)) return true
+      if (p === '/path/to/settings.json') return true
+      return false
+    })
+    const ours = { type: 'command', command: 'node "/dest/hooks/usage-reporter.js"' }
+    mockFs.readFileSync.mockReturnValue(JSON.stringify({ statusLine: ours }))
+
+    runSetupSync({
+      hookSourcePath: '/source/hooks/status-reporter.js',
+      hookDestPath: '/dest/hooks/status-reporter.js',
+      usageReporterDestPath: '/dest/hooks/usage-reporter.js',
+      wrappedStatusLinePath: '/dest/wrapped-statusline.json',
+      settingsPath: '/path/to/settings.json'
+    })
+
+    const writes = mockFs.writeFileSync.mock.calls
+    expect(writes.some(([p]) => p === '/dest/wrapped-statusline.json')).toBe(false)
+    const settingsWrite = writes.find(([p]) => p === '/path/to/settings.json')
+    const parsed = JSON.parse(settingsWrite![1] as string) as ClaudeSettings
+    expect(parsed.statusLine).toEqual(ours)
   })
 })

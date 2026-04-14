@@ -12,7 +12,7 @@
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import type { HookEntry, ClaudeSettings } from '../shared/types'
+import type { HookEntry, ClaudeSettings, StatusLineConfig } from '../shared/types'
 
 const HOME = os.homedir()
 const COMPANION_DIR = path.join(HOME, '.agent-paperclip')
@@ -21,23 +21,27 @@ const COMPANION_LIB_DIR = path.join(COMPANION_DIR, 'lib')
 const CLAUDE_DIR = path.join(HOME, '.claude')
 const SETTINGS_FILE = path.join(CLAUDE_DIR, 'settings.json')
 const HOOK_SCRIPT = path.join(COMPANION_HOOKS_DIR, 'status-reporter.js')
+const USAGE_REPORTER_SCRIPT = path.join(COMPANION_HOOKS_DIR, 'usage-reporter.js')
+const WRAPPED_STATUSLINE_FILE = path.join(COMPANION_DIR, 'wrapped-statusline.json')
 const LIB_STATUS_WRITER = path.join(COMPANION_LIB_DIR, 'status-writer.js')
 
 function removeHookScript(): void {
-  if (fs.existsSync(HOOK_SCRIPT)) {
-    fs.unlinkSync(HOOK_SCRIPT)
-    console.log(`Removed hook script: ${HOOK_SCRIPT}`)
-
-    // Try to remove hooks directory if empty
-    try {
-      const files = fs.readdirSync(COMPANION_HOOKS_DIR)
-      if (files.length === 0) {
-        fs.rmdirSync(COMPANION_HOOKS_DIR)
-        console.log(`Removed empty directory: ${COMPANION_HOOKS_DIR}`)
-      }
-    } catch {
-      // Directory not empty or doesn't exist, that's fine
+  for (const script of [HOOK_SCRIPT, USAGE_REPORTER_SCRIPT]) {
+    if (fs.existsSync(script)) {
+      fs.unlinkSync(script)
+      console.log(`Removed hook script: ${script}`)
     }
+  }
+
+  // Try to remove hooks directory if empty
+  try {
+    const files = fs.readdirSync(COMPANION_HOOKS_DIR)
+    if (files.length === 0) {
+      fs.rmdirSync(COMPANION_HOOKS_DIR)
+      console.log(`Removed empty directory: ${COMPANION_HOOKS_DIR}`)
+    }
+  } catch {
+    // Directory not empty or doesn't exist, that's fine
   }
 }
 
@@ -119,11 +123,54 @@ function removeHooksFromSettings(): void {
   }
 }
 
+function readWrappedStatusLine(): StatusLineConfig | null {
+  if (!fs.existsSync(WRAPPED_STATUSLINE_FILE)) return null
+  try {
+    const content = fs.readFileSync(WRAPPED_STATUSLINE_FILE, 'utf8')
+    const parsed = JSON.parse(content) as StatusLineConfig
+    if (!parsed?.command) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function restoreStatusLine(): void {
+  if (!fs.existsSync(SETTINGS_FILE)) return
+
+  let settings: ClaudeSettings
+  try {
+    settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) as ClaudeSettings
+  } catch {
+    return
+  }
+
+  const current = settings.statusLine
+  const isOurs = current?.command?.includes('usage-reporter.js') ?? false
+  if (!current || !isOurs) return
+
+  const wrapped = readWrappedStatusLine()
+  if (wrapped) {
+    settings.statusLine = wrapped
+    console.log(`Restored original statusLine in ${SETTINGS_FILE}`)
+  } else {
+    delete settings.statusLine
+    console.log(`Removed Agent Paperclip statusLine from ${SETTINGS_FILE}`)
+  }
+
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2))
+
+  if (fs.existsSync(WRAPPED_STATUSLINE_FILE)) {
+    fs.unlinkSync(WRAPPED_STATUSLINE_FILE)
+  }
+}
+
 function main(): void {
   console.log('\nRemoving Agent Paperclip hooks...\n')
 
   try {
     removeHooksFromSettings()
+    restoreStatusLine()
     removeHookScript()
     removeLibFiles()
 
