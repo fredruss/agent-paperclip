@@ -43,7 +43,7 @@ function VisibleUsageBadge({ usage }: { usage: UsageInfo }): ReactNode {
 
   return (
     <div className={className}>
-      {pct}% · {timeStr}
+      Claude: {pct}% · {timeStr}
     </div>
   )
 }

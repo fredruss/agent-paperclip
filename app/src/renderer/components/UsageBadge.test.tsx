@@ -62,7 +62,7 @@ describe('UsageBadge', () => {
   it('renders rounded percent and hours when idle', () => {
     const usage = makeUsage({ usedPercentage: 42.5, resetsAt: FIXED_NOW_SECONDS + 3 * 3600 })
     const { container } = render(<UsageBadge usage={usage} status="idle" />)
-    expect(container.textContent).toBe('43% · 3h')
+    expect(container.textContent).toBe('Claude: 43% · 3h')
   })
 
   it('renders 0% when usage is zero', () => {
