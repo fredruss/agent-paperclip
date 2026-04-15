@@ -47,6 +47,8 @@ describe('preload', () => {
   it('exposes all required methods', () => {
     expect(exposedAPI).toHaveProperty('getStatus')
     expect(exposedAPI).toHaveProperty('onStatusUpdate')
+    expect(exposedAPI).toHaveProperty('getUsage')
+    expect(exposedAPI).toHaveProperty('onUsageUpdate')
     expect(exposedAPI).toHaveProperty('dragStart')
     expect(exposedAPI).toHaveProperty('dragMove')
     expect(exposedAPI).toHaveProperty('dragEnd')
@@ -107,6 +109,69 @@ describe('preload', () => {
       registeredHandler({}, mockStatus)
 
       expect(callback).toHaveBeenCalledWith(mockStatus)
+    })
+  })
+
+  describe('getUsage', () => {
+    it('invokes get-usage IPC channel', async () => {
+      const mockUsage = { usedPercentage: 42.5, resetsAt: 1, updatedAt: 2 }
+      mockInvoke.mockResolvedValue(mockUsage)
+
+      const getUsage = exposedAPI.getUsage as () => Promise<unknown>
+      const result = await getUsage()
+
+      expect(mockInvoke).toHaveBeenCalledWith('get-usage')
+      expect(result).toEqual(mockUsage)
+    })
+  })
+
+  describe('onUsageUpdate', () => {
+    it('registers listener on usage-update channel', () => {
+      const callback = vi.fn()
+      const onUsageUpdate = exposedAPI.onUsageUpdate as (cb: (usage: unknown) => void) => () => void
+
+      onUsageUpdate(callback)
+
+      expect(mockOn).toHaveBeenCalledWith('usage-update', expect.any(Function))
+    })
+
+    it('returns working unsubscribe function', () => {
+      const callback = vi.fn()
+      const onUsageUpdate = exposedAPI.onUsageUpdate as (cb: (usage: unknown) => void) => () => void
+
+      const unsubscribe = onUsageUpdate(callback)
+
+      expect(typeof unsubscribe).toBe('function')
+
+      unsubscribe()
+
+      expect(mockRemoveListener).toHaveBeenCalledWith('usage-update', expect.any(Function))
+    })
+
+    it('calls callback with usage when event fires', () => {
+      const callback = vi.fn()
+      const onUsageUpdate = exposedAPI.onUsageUpdate as (cb: (usage: unknown) => void) => () => void
+
+      onUsageUpdate(callback)
+
+      const registeredHandler = mockOn.mock.calls[0][1]
+      const mockUsage = { usedPercentage: 10, resetsAt: 100, updatedAt: 50 }
+
+      registeredHandler({}, mockUsage)
+
+      expect(callback).toHaveBeenCalledWith(mockUsage)
+    })
+
+    it('forwards null usage to callback', () => {
+      const callback = vi.fn()
+      const onUsageUpdate = exposedAPI.onUsageUpdate as (cb: (usage: unknown) => void) => () => void
+
+      onUsageUpdate(callback)
+
+      const registeredHandler = mockOn.mock.calls[0][1]
+      registeredHandler({}, null)
+
+      expect(callback).toHaveBeenCalledWith(null)
     })
   })
 

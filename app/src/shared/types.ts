@@ -31,9 +31,19 @@ export interface MultiSessionStatus {
 export type MultiSessionCallback = (status: MultiSessionStatus) => void
 export type PackCallback = (packId: string) => void
 
+export interface UsageInfo {
+  usedPercentage: number
+  resetsAt: number
+  updatedAt: number
+}
+
+export type UsageCallback = (usage: UsageInfo | null) => void
+
 export interface ElectronAPI {
   getStatus: () => Promise<MultiSessionStatus>
   onStatusUpdate: (callback: MultiSessionCallback) => () => void
+  getUsage: () => Promise<UsageInfo | null>
+  onUsageUpdate: (callback: UsageCallback) => () => void
   dragStart: (x: number, y: number) => void
   dragMove: (x: number, y: number) => void
   dragEnd: () => void

@@ -1,10 +1,11 @@
 import { type ReactNode } from 'react'
-import { Pet, StatusBubble, TokenBadge, SessionCount } from './components'
-import { useStatus, useSound } from './hooks'
+import { Pet, StatusBubble, TokenBadge, SessionCount, UsageBadge } from './components'
+import { useStatus, useSound, useUsage } from './hooks'
 import './App.css'
 
 function App(): ReactNode {
   const { primary, sessions, sessionCount, isHydrated, lastUpdateSource } = useStatus()
+  const usage = useUsage()
   useSound(primary.status, isHydrated, lastUpdateSource)
 
   return (
@@ -15,6 +16,7 @@ function App(): ReactNode {
         <SessionCount count={sessionCount} />
       </div>
       <TokenBadge sessions={sessions} status={primary.status} />
+      {isHydrated && <UsageBadge usage={usage} status={primary.status} />}
     </div>
   )
 }

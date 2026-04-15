@@ -22,22 +22,26 @@ const COMPANION_LIB_DIR = path_1.default.join(COMPANION_DIR, 'lib');
 const CLAUDE_DIR = path_1.default.join(HOME, '.claude');
 const SETTINGS_FILE = path_1.default.join(CLAUDE_DIR, 'settings.json');
 const HOOK_SCRIPT = path_1.default.join(COMPANION_HOOKS_DIR, 'status-reporter.js');
+const USAGE_REPORTER_SCRIPT = path_1.default.join(COMPANION_HOOKS_DIR, 'usage-reporter.js');
+const WRAPPED_STATUSLINE_FILE = path_1.default.join(COMPANION_DIR, 'wrapped-statusline.json');
 const LIB_STATUS_WRITER = path_1.default.join(COMPANION_LIB_DIR, 'status-writer.js');
 function removeHookScript() {
-    if (fs_1.default.existsSync(HOOK_SCRIPT)) {
-        fs_1.default.unlinkSync(HOOK_SCRIPT);
-        console.log(`Removed hook script: ${HOOK_SCRIPT}`);
-        // Try to remove hooks directory if empty
-        try {
-            const files = fs_1.default.readdirSync(COMPANION_HOOKS_DIR);
-            if (files.length === 0) {
-                fs_1.default.rmdirSync(COMPANION_HOOKS_DIR);
-                console.log(`Removed empty directory: ${COMPANION_HOOKS_DIR}`);
-            }
+    for (const script of [HOOK_SCRIPT, USAGE_REPORTER_SCRIPT]) {
+        if (fs_1.default.existsSync(script)) {
+            fs_1.default.unlinkSync(script);
+            console.log(`Removed hook script: ${script}`);
         }
-        catch {
-            // Directory not empty or doesn't exist, that's fine
+    }
+    // Try to remove hooks directory if empty
+    try {
+        const files = fs_1.default.readdirSync(COMPANION_HOOKS_DIR);
+        if (files.length === 0) {
+            fs_1.default.rmdirSync(COMPANION_HOOKS_DIR);
+            console.log(`Removed empty directory: ${COMPANION_HOOKS_DIR}`);
         }
+    }
+    catch {
+        // Directory not empty or doesn't exist, that's fine
     }
 }
 function removeLibFiles() {
@@ -108,10 +112,69 @@ function removeHooksFromSettings() {
         console.log('No Agent Paperclip hooks found in settings');
     }
 }
+function readWrappedStatusLine() {
+    if (!fs_1.default.existsSync(WRAPPED_STATUSLINE_FILE))
+        return null;
+    try {
+        const content = fs_1.default.readFileSync(WRAPPED_STATUSLINE_FILE, 'utf8');
+        const parsed = JSON.parse(content);
+        if (!parsed?.command)
+            return null;
+        return parsed;
+    }
+    catch {
+        return null;
+    }
+}
+function cleanupWrappedStatusLineFile() {
+    if (fs_1.default.existsSync(WRAPPED_STATUSLINE_FILE)) {
+        fs_1.default.unlinkSync(WRAPPED_STATUSLINE_FILE);
+    }
+}
+function restoreStatusLine() {
+    if (!fs_1.default.existsSync(SETTINGS_FILE)) {
+        // No Claude settings exist — our statusLine can't be referenced, so the
+        // wrapper backup is orphaned and safe to drop.
+        cleanupWrappedStatusLineFile();
+        return;
+    }
+    let settings;
+    try {
+        settings = JSON.parse(fs_1.default.readFileSync(SETTINGS_FILE, 'utf8'));
+    }
+    catch {
+        // settings.json is unreadable — we can't tell whether Claude still points
+        // at usage-reporter.js, so preserve the backup for manual recovery.
+        return;
+    }
+    const current = settings.statusLine;
+    const isOurs = current?.command?.includes('usage-reporter.js') ?? false;
+    if (!current || !isOurs) {
+        // Our statusLine isn't active (user changed it, or never set). The backup
+        // is orphaned and safe to drop.
+        cleanupWrappedStatusLineFile();
+        return;
+    }
+    const wrapped = readWrappedStatusLine();
+    if (wrapped) {
+        settings.statusLine = wrapped;
+        console.log(`Restored original statusLine in ${SETTINGS_FILE}`);
+    }
+    else {
+        delete settings.statusLine;
+        console.log(`Removed Agent Paperclip statusLine from ${SETTINGS_FILE}`);
+    }
+    // Only drop the backup once the restore write succeeds. If writeFileSync
+    // throws, the caller's top-level handler logs the error and the backup
+    // stays on disk so the user can recover.
+    fs_1.default.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    cleanupWrappedStatusLineFile();
+}
 function main() {
     console.log('\nRemoving Agent Paperclip hooks...\n');
     try {
         removeHooksFromSettings();
+        restoreStatusLine();
         removeHookScript();
         removeLibFiles();
         console.log('\nAgent Paperclip hooks removed.');
