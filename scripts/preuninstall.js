@@ -126,20 +126,35 @@ function readWrappedStatusLine() {
         return null;
     }
 }
+function cleanupWrappedStatusLineFile() {
+    if (fs_1.default.existsSync(WRAPPED_STATUSLINE_FILE)) {
+        fs_1.default.unlinkSync(WRAPPED_STATUSLINE_FILE);
+    }
+}
 function restoreStatusLine() {
-    if (!fs_1.default.existsSync(SETTINGS_FILE))
+    if (!fs_1.default.existsSync(SETTINGS_FILE)) {
+        // No Claude settings exist — our statusLine can't be referenced, so the
+        // wrapper backup is orphaned and safe to drop.
+        cleanupWrappedStatusLineFile();
         return;
+    }
     let settings;
     try {
         settings = JSON.parse(fs_1.default.readFileSync(SETTINGS_FILE, 'utf8'));
     }
     catch {
+        // settings.json is unreadable — we can't tell whether Claude still points
+        // at usage-reporter.js, so preserve the backup for manual recovery.
         return;
     }
     const current = settings.statusLine;
     const isOurs = current?.command?.includes('usage-reporter.js') ?? false;
-    if (!current || !isOurs)
+    if (!current || !isOurs) {
+        // Our statusLine isn't active (user changed it, or never set). The backup
+        // is orphaned and safe to drop.
+        cleanupWrappedStatusLineFile();
         return;
+    }
     const wrapped = readWrappedStatusLine();
     if (wrapped) {
         settings.statusLine = wrapped;
@@ -149,10 +164,11 @@ function restoreStatusLine() {
         delete settings.statusLine;
         console.log(`Removed Agent Paperclip statusLine from ${SETTINGS_FILE}`);
     }
+    // Only drop the backup once the restore write succeeds. If writeFileSync
+    // throws, the caller's top-level handler logs the error and the backup
+    // stays on disk so the user can recover.
     fs_1.default.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
-    if (fs_1.default.existsSync(WRAPPED_STATUSLINE_FILE)) {
-        fs_1.default.unlinkSync(WRAPPED_STATUSLINE_FILE);
-    }
+    cleanupWrappedStatusLineFile();
 }
 function main() {
     console.log('\nRemoving Agent Paperclip hooks...\n');

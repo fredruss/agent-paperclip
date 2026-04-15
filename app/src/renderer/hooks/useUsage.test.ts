@@ -99,6 +99,32 @@ describe('useUsage', () => {
     expect(result.current).toEqual(live)
   })
 
+  it('preserves a live null when initial snapshot resolves stale data later', async () => {
+    let resolveSnapshot: (value: UsageInfo | null) => void = () => {}
+    mockGetUsage.mockReturnValue(
+      new Promise<UsageInfo | null>((resolve) => {
+        resolveSnapshot = resolve
+      })
+    )
+
+    const { result } = renderHook(() => useUsage())
+
+    // Live update clears usage (e.g. hook deleted usage.json) before the
+    // initial getUsage() read completes.
+    act(() => {
+      usageCallback?.(null)
+    })
+
+    expect(result.current).toBeNull()
+
+    // Initial resolves with a stale snapshot read before the file was deleted.
+    await act(async () => {
+      resolveSnapshot({ usedPercentage: 10, resetsAt: 50, updatedAt: 10 })
+    })
+
+    expect(result.current).toBeNull()
+  })
+
   it('cleans up subscription on unmount', async () => {
     mockGetUsage.mockResolvedValue(null)
     const { unmount } = renderHook(() => useUsage())

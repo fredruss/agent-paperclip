@@ -135,19 +135,37 @@ function readWrappedStatusLine(): StatusLineConfig | null {
   }
 }
 
+function cleanupWrappedStatusLineFile(): void {
+  if (fs.existsSync(WRAPPED_STATUSLINE_FILE)) {
+    fs.unlinkSync(WRAPPED_STATUSLINE_FILE)
+  }
+}
+
 function restoreStatusLine(): void {
-  if (!fs.existsSync(SETTINGS_FILE)) return
+  if (!fs.existsSync(SETTINGS_FILE)) {
+    // No Claude settings exist — our statusLine can't be referenced, so the
+    // wrapper backup is orphaned and safe to drop.
+    cleanupWrappedStatusLineFile()
+    return
+  }
 
   let settings: ClaudeSettings
   try {
     settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) as ClaudeSettings
   } catch {
+    // settings.json is unreadable — we can't tell whether Claude still points
+    // at usage-reporter.js, so preserve the backup for manual recovery.
     return
   }
 
   const current = settings.statusLine
   const isOurs = current?.command?.includes('usage-reporter.js') ?? false
-  if (!current || !isOurs) return
+  if (!current || !isOurs) {
+    // Our statusLine isn't active (user changed it, or never set). The backup
+    // is orphaned and safe to drop.
+    cleanupWrappedStatusLineFile()
+    return
+  }
 
   const wrapped = readWrappedStatusLine()
   if (wrapped) {
@@ -158,11 +176,11 @@ function restoreStatusLine(): void {
     console.log(`Removed Agent Paperclip statusLine from ${SETTINGS_FILE}`)
   }
 
+  // Only drop the backup once the restore write succeeds. If writeFileSync
+  // throws, the caller's top-level handler logs the error and the backup
+  // stays on disk so the user can recover.
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2))
-
-  if (fs.existsSync(WRAPPED_STATUSLINE_FILE)) {
-    fs.unlinkSync(WRAPPED_STATUSLINE_FILE)
-  }
+  cleanupWrappedStatusLineFile()
 }
 
 function main(): void {
