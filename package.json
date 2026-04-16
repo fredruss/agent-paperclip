@@ -12,6 +12,7 @@
     "dev": "cd app && npm run dev",
     "dev:debug": "cd app && npm run dev:debug",
     "build:scripts": "tsc -p tsconfig.scripts.json",
+    "verify:scripts": "npm run build:scripts && git diff --exit-code -- bin/ hooks/ lib/ scripts/ codex/",
     "build": "npm run build:scripts && cd app && npm run build && rm -rf ../out && cp -r out .. && cp resources/icon.png ../out/",
     "test": "npm run test:scripts && cd app && npm test",
     "test:run": "npm run test:scripts:run && cd app && npm run test:run",

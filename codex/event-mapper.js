@@ -8,6 +8,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.mapCodexEvent = mapCodexEvent;
 exports.extractUsageFromEntry = extractUsageFromEntry;
+exports.extractRateLimitsFromEntry = extractRateLimitsFromEntry;
+const FIVE_HOUR_WINDOW_MINUTES = 300;
 function truncateText(text, maxLength = 40) {
     if (text.length <= maxLength)
         return text;
@@ -137,4 +139,33 @@ function extractUsageFromEntry(entry) {
     if (payload.type !== 'token_count')
         return undefined;
     return extractUsage(payload);
+}
+function isValidWindow(w) {
+    return (!!w &&
+        typeof w.used_percent === 'number' &&
+        typeof w.resets_at === 'number');
+}
+// Prefer the 5-hour window (window_minutes=300) for parity with Claude's
+// statusLine badge. If primary isn't a 5-hour window (e.g. a shorter rolling
+// window), fall back to whichever primary is present, then secondary.
+function extractRateLimitsFromEntry(entry) {
+    if (entry.type !== 'event_msg')
+        return undefined;
+    const payload = entry.payload;
+    if (payload.type !== 'token_count')
+        return undefined;
+    const rate = payload.rate_limits;
+    if (!rate)
+        return undefined;
+    const candidates = [rate.primary, rate.secondary].filter(isValidWindow);
+    if (candidates.length === 0)
+        return undefined;
+    const fiveHour = candidates.find((w) => w.window_minutes === FIVE_HOUR_WINDOW_MINUTES);
+    const chosen = fiveHour ?? candidates[0];
+    return {
+        source: 'codex',
+        usedPercentage: chosen.used_percent,
+        resetsAt: chosen.resets_at,
+        updatedAt: Math.floor(Date.now() / 1000)
+    };
 }

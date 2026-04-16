@@ -15,6 +15,7 @@ import type { PetState, TokenUsage, Status, SessionSource, SessionsFile } from '
 export const STATUS_DIR = join(homedir(), '.agent-paperclip')
 export const STATUS_FILE = join(STATUS_DIR, 'status.json')
 export const SESSIONS_FILE = join(STATUS_DIR, 'sessions.json')
+export const USAGE_FILE = join(STATUS_DIR, 'usage.json')
 const SESSIONS_LOCK_FILE = `${SESSIONS_FILE}.lock`
 const SESSIONS_LOCK_RETRY_MS = 50
 const SESSIONS_LOCK_TIMEOUT_MS = 5_000
@@ -183,6 +184,38 @@ export async function removeSession(sessionId: string): Promise<void> {
     await updateSessionsFile((file) => {
       delete file.sessions[sessionId]
     })
+  })
+
+  writeChain = task.catch(() => {
+    // noop
+  })
+
+  await task
+}
+
+export interface UsageSnapshot {
+  source: SessionSource
+  usedPercentage: number
+  resetsAt: number
+  updatedAt: number
+}
+
+export async function writeUsage(snapshot: UsageSnapshot): Promise<void> {
+  const task = writeChain.then(async () => {
+    await ensureStatusDir()
+    const tempFile = `${USAGE_FILE}.${process.pid}.${Date.now()}.tmp`
+    let renamed = false
+    try {
+      await writeFile(tempFile, JSON.stringify(snapshot))
+      await rename(tempFile, USAGE_FILE)
+      renamed = true
+    } finally {
+      if (!renamed) {
+        await rm(tempFile, { force: true }).catch(() => {
+          // noop
+        })
+      }
+    }
   })
 
   writeChain = task.catch(() => {

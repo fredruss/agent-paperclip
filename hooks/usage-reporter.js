@@ -38,6 +38,7 @@ function extractUsage(payload) {
         return null;
     }
     return {
+        source: 'claude-code',
         usedPercentage: used_percentage,
         resetsAt: resets_at,
         updatedAt: Math.floor(Date.now() / 1000)

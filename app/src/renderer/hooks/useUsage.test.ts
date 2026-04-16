@@ -47,7 +47,7 @@ describe('useUsage', () => {
   })
 
   it('returns usage from initial snapshot', async () => {
-    const snapshot: UsageInfo = { usedPercentage: 42, resetsAt: 100, updatedAt: 50 }
+    const snapshot: UsageInfo = { source: 'claude-code', usedPercentage: 42, resetsAt: 100, updatedAt: 50 }
     mockGetUsage.mockResolvedValue(snapshot)
 
     const { result } = renderHook(() => useUsage())
@@ -67,7 +67,7 @@ describe('useUsage', () => {
       await mockGetUsage.mock.results[0]?.value
     })
 
-    const live: UsageInfo = { usedPercentage: 85, resetsAt: 200, updatedAt: 100 }
+    const live: UsageInfo = { source: 'claude-code', usedPercentage: 85, resetsAt: 200, updatedAt: 100 }
     act(() => {
       usageCallback?.(live)
     })
@@ -85,7 +85,7 @@ describe('useUsage', () => {
 
     const { result } = renderHook(() => useUsage())
 
-    const live: UsageInfo = { usedPercentage: 50, resetsAt: 200, updatedAt: 100 }
+    const live: UsageInfo = { source: 'claude-code', usedPercentage: 50, resetsAt: 200, updatedAt: 100 }
     act(() => {
       usageCallback?.(live)
     })
@@ -93,7 +93,7 @@ describe('useUsage', () => {
     expect(result.current).toEqual(live)
 
     await act(async () => {
-      resolveSnapshot({ usedPercentage: 10, resetsAt: 50, updatedAt: 10 })
+      resolveSnapshot({ source: 'claude-code', usedPercentage: 10, resetsAt: 50, updatedAt: 10 })
     })
 
     expect(result.current).toEqual(live)
@@ -119,7 +119,7 @@ describe('useUsage', () => {
 
     // Initial resolves with a stale snapshot read before the file was deleted.
     await act(async () => {
-      resolveSnapshot({ usedPercentage: 10, resetsAt: 50, updatedAt: 10 })
+      resolveSnapshot({ source: 'claude-code', usedPercentage: 10, resetsAt: 50, updatedAt: 10 })
     })
 
     expect(result.current).toBeNull()

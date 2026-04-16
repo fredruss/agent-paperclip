@@ -32,6 +32,7 @@ export type MultiSessionCallback = (status: MultiSessionStatus) => void
 export type PackCallback = (packId: string) => void
 
 export interface UsageInfo {
+  source: SessionSource
   usedPercentage: number
   resetsAt: number
   updatedAt: number

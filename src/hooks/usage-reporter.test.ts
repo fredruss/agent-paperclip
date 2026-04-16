@@ -43,6 +43,7 @@ describe('extractUsage', () => {
     const snapshot = extractUsage({
       rate_limits: { five_hour: { used_percentage: 42.5, resets_at: 1_700_000_000 } }
     })
+    expect(snapshot?.source).toBe('claude-code')
     expect(snapshot?.usedPercentage).toBe(42.5)
     expect(snapshot?.resetsAt).toBe(1_700_000_000)
     expect(typeof snapshot?.updatedAt).toBe('number')

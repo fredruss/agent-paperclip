@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { mapCodexEvent, extractUsageFromEntry } from './event-mapper'
+import { mapCodexEvent, extractUsageFromEntry, extractRateLimitsFromEntry } from './event-mapper'
 import type { CodexRolloutEntry } from './types'
 
 function entry(type: string, payload: Record<string, unknown>): CodexRolloutEntry {
@@ -254,5 +254,76 @@ describe('extractUsageFromEntry', () => {
       info: null
     }))
     expect(result).toBeUndefined()
+  })
+})
+
+describe('extractRateLimitsFromEntry', () => {
+  it('returns primary (5-hour) window with codex source', () => {
+    const result = extractRateLimitsFromEntry(entry('event_msg', {
+      type: 'token_count',
+      info: null,
+      rate_limits: {
+        limit_id: 'codex',
+        primary: { used_percent: 8.5, window_minutes: 300, resets_at: 1_776_000_000 },
+        secondary: { used_percent: 42, window_minutes: 10_080, resets_at: 1_776_500_000 },
+        plan_type: 'plus'
+      }
+    }))
+    expect(result).toMatchObject({
+      source: 'codex',
+      usedPercentage: 8.5,
+      resetsAt: 1_776_000_000
+    })
+    expect(typeof result?.updatedAt).toBe('number')
+  })
+
+  it('falls back to secondary when primary window_minutes is not 300', () => {
+    const result = extractRateLimitsFromEntry(entry('event_msg', {
+      type: 'token_count',
+      info: null,
+      rate_limits: {
+        primary: { used_percent: 5, window_minutes: 60, resets_at: 1 },
+        secondary: { used_percent: 70, window_minutes: 300, resets_at: 2 }
+      }
+    }))
+    expect(result?.usedPercentage).toBe(70)
+    expect(result?.resetsAt).toBe(2)
+  })
+
+  it('falls back to primary when no 5-hour window exists', () => {
+    const result = extractRateLimitsFromEntry(entry('event_msg', {
+      type: 'token_count',
+      info: null,
+      rate_limits: {
+        primary: { used_percent: 25, window_minutes: 60, resets_at: 100 }
+      }
+    }))
+    expect(result?.usedPercentage).toBe(25)
+  })
+
+  it('returns undefined when rate_limits is missing', () => {
+    const result = extractRateLimitsFromEntry(entry('event_msg', {
+      type: 'token_count',
+      info: null
+    }))
+    expect(result).toBeUndefined()
+  })
+
+  it('returns undefined when rate_limits has no valid windows', () => {
+    const result = extractRateLimitsFromEntry(entry('event_msg', {
+      type: 'token_count',
+      info: null,
+      rate_limits: { primary: null, secondary: null }
+    }))
+    expect(result).toBeUndefined()
+  })
+
+  it('returns undefined for non-token_count events', () => {
+    expect(
+      extractRateLimitsFromEntry(entry('event_msg', { type: 'user_message', message: 'hi' }))
+    ).toBeUndefined()
+    expect(
+      extractRateLimitsFromEntry(entry('session_meta', { id: 'a', timestamp: '', cwd: '/', cli_version: '1' }))
+    ).toBeUndefined()
   })
 })

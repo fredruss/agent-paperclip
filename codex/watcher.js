@@ -36,6 +36,13 @@ function createEventHandler() {
         const usage = (0, event_mapper_1.extractUsageFromEntry)(entry);
         if (usage)
             usageBySession.set(sessionId, usage);
+        // Mirror Codex's rate limits to usage.json so the badge can render.
+        const rateSnapshot = (0, event_mapper_1.extractRateLimitsFromEntry)(entry);
+        if (rateSnapshot) {
+            (0, status_writer_1.writeUsage)(rateSnapshot).catch((err) => {
+                console.error(`[watcher] writeUsage failed:`, err);
+            });
+        }
         // Map to pet state
         const update = (0, event_mapper_1.mapCodexEvent)(entry);
         if (!update)

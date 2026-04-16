@@ -30,6 +30,10 @@ function useNowSeconds(): number {
   return now
 }
 
+function sourceLabel(source: UsageInfo['source']): string {
+  return source === 'codex' ? 'Codex' : 'Claude'
+}
+
 function VisibleUsageBadge({ usage }: { usage: UsageInfo }): ReactNode {
   const nowSeconds = useNowSeconds()
 
@@ -43,7 +47,7 @@ function VisibleUsageBadge({ usage }: { usage: UsageInfo }): ReactNode {
 
   return (
     <div className={className}>
-      Claude: {pct}% · {timeStr}
+      {sourceLabel(usage.source)}: {pct}% · {timeStr}
     </div>
   )
 }
