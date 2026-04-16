@@ -35,5 +35,5 @@ CLAUDE.md
 AGENTS.md
 
 # Local tool state
-.claude/settings.local.json
+.claude/
 Microsoft/Windows/PowerShell/ModuleAnalysisCache
