@@ -68,9 +68,9 @@ The pet also displays the context window usage (input + cache tokens from the la
 
 When the agent is idle, a small badge like `Claude: 42% · 3h` shows how much of the 5-hour session window is used and how long until it resets. A few notes:
 
-- Supported for both Claude Code and Codex. The pet shows whichever agent most recently reported usage labels the badge (`Claude: …` or `Codex: …`).
-- Claude data is powered by a statusLine script installed automatically by `agent-paperclip setup`. Any pre-existing statusLine you had is preserved and still rendered.
-- The badge only appears when the pet is idle (so it never competes with live activity).
+- Works with Claude Code and Codex; the label reflects whichever agent most recently reported usage. Codex support has only been tested on macOS.
+- Paid plans only — free-tier sessions don't expose this data, and values populate after the first API response in a session.
+- Claude data comes from a statusLine script installed by `agent-paperclip setup` (any pre-existing statusLine is preserved). The badge only appears when the pet is idle.
 
 It can also play a sound when the agent needs input (`Waiting`) or finishes (`Done`). This can be turned off from the pet's menu.
 
