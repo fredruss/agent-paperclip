@@ -12,7 +12,8 @@ import type {
   ResponseItemPayload,
   FunctionCallPayload,
   CustomToolCallPayload,
-  TokenCountPayload
+  TokenCountPayload,
+  RateLimitWindow
 } from './types'
 
 export interface PetUpdate {
@@ -20,6 +21,15 @@ export interface PetUpdate {
   action: string
   usage?: TokenUsage
 }
+
+export interface CodexUsageSnapshot {
+  source: 'codex'
+  usedPercentage: number
+  resetsAt: number
+  updatedAt: number
+}
+
+const FIVE_HOUR_WINDOW_MINUTES = 300
 
 function truncateText(text: string, maxLength: number = 40): string {
   if (text.length <= maxLength) return text
@@ -174,4 +184,38 @@ export function extractUsageFromEntry(entry: CodexRolloutEntry): TokenUsage | un
   const payload = entry.payload as EventMsgPayload
   if (payload.type !== 'token_count') return undefined
   return extractUsage(payload as TokenCountPayload)
+}
+
+function isValidWindow(w: RateLimitWindow | null | undefined): w is RateLimitWindow {
+  return (
+    !!w &&
+    typeof w.used_percent === 'number' &&
+    typeof w.resets_at === 'number'
+  )
+}
+
+// Prefer the 5-hour window (window_minutes=300) for parity with Claude's
+// statusLine badge. If primary isn't a 5-hour window (e.g. a shorter rolling
+// window), fall back to whichever primary is present, then secondary.
+export function extractRateLimitsFromEntry(
+  entry: CodexRolloutEntry
+): CodexUsageSnapshot | undefined {
+  if (entry.type !== 'event_msg') return undefined
+  const payload = entry.payload as EventMsgPayload
+  if (payload.type !== 'token_count') return undefined
+  const rate = (payload as TokenCountPayload).rate_limits
+  if (!rate) return undefined
+
+  const candidates = [rate.primary, rate.secondary].filter(isValidWindow)
+  if (candidates.length === 0) return undefined
+
+  const fiveHour = candidates.find((w) => w.window_minutes === FIVE_HOUR_WINDOW_MINUTES)
+  const chosen = fiveHour ?? candidates[0]
+
+  return {
+    source: 'codex',
+    usedPercentage: chosen.used_percent,
+    resetsAt: chosen.resets_at,
+    updatedAt: Math.floor(Date.now() / 1000)
+  }
 }

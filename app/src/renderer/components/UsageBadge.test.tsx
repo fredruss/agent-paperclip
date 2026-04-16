@@ -7,6 +7,7 @@ const FIXED_NOW_SECONDS = 1_744_000_000
 
 function makeUsage(overrides: Partial<UsageInfo> = {}): UsageInfo {
   return {
+    source: 'claude-code',
     usedPercentage: 42.5,
     resetsAt: FIXED_NOW_SECONDS + 3 * 3600,
     updatedAt: FIXED_NOW_SECONDS,
@@ -63,6 +64,12 @@ describe('UsageBadge', () => {
     const usage = makeUsage({ usedPercentage: 42.5, resetsAt: FIXED_NOW_SECONDS + 3 * 3600 })
     const { container } = render(<UsageBadge usage={usage} status="idle" />)
     expect(container.textContent).toBe('Claude: 43% · 3h')
+  })
+
+  it('renders "Codex:" label when source is codex', () => {
+    const usage = makeUsage({ source: 'codex', usedPercentage: 12, resetsAt: FIXED_NOW_SECONDS + 2 * 3600 })
+    const { container } = render(<UsageBadge usage={usage} status="idle" />)
+    expect(container.textContent).toBe('Codex: 12% · 2h')
   })
 
   it('renders 0% when usage is zero', () => {

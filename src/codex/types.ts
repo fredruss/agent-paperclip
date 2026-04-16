@@ -54,6 +54,21 @@ export interface AgentReasoningPayload {
   text: string
 }
 
+export interface RateLimitWindow {
+  used_percent: number
+  window_minutes: number
+  resets_at: number
+}
+
+export interface RateLimits {
+  limit_id?: string | null
+  limit_name?: string | null
+  primary?: RateLimitWindow | null
+  secondary?: RateLimitWindow | null
+  credits?: unknown
+  plan_type?: string | null
+}
+
 export interface TokenCountPayload {
   type: 'token_count'
   info: {
@@ -73,7 +88,7 @@ export interface TokenCountPayload {
     }
     model_context_window?: number
   } | null
-  rate_limits?: unknown
+  rate_limits?: RateLimits | null
 }
 
 export interface TaskStartedPayload {

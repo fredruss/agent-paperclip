@@ -9,6 +9,7 @@ vi.mock('fs', () => ({
 vi.mock('../lib/status-writer', () => ({
   writeStatus: vi.fn().mockResolvedValue(undefined),
   writeSessionStatus: vi.fn().mockResolvedValue(undefined),
+  writeUsage: vi.fn().mockResolvedValue(undefined),
   removeSession: vi.fn().mockResolvedValue(undefined),
   sessionIdFromPath: vi.fn((path: string) => `sid-${path.split('/').pop()}`)
 }))
@@ -34,10 +35,11 @@ vi.mock('./session-watcher', () => ({
 }))
 
 import { createEventHandler } from './watcher'
-import { writeStatus, writeSessionStatus, removeSession } from '../lib/status-writer'
+import { writeStatus, writeSessionStatus, writeUsage, removeSession } from '../lib/status-writer'
 
 const mockedWriteStatus = vi.mocked(writeStatus)
 const mockedWriteSessionStatus = vi.mocked(writeSessionStatus)
+const mockedWriteUsage = vi.mocked(writeUsage)
 const mockedRemoveSession = vi.mocked(removeSession)
 
 function entry(type: string, payload: Record<string, unknown>): CodexRolloutEntry {
@@ -154,6 +156,35 @@ describe('createEventHandler', () => {
     handle(entry('event_msg', { type: 'task_started', turn_id: 't1' }), '/sessions/rollout-a.jsonl')
 
     expect(mockedRemoveSession).not.toHaveBeenCalled()
+  })
+
+  it('writes usage.json when token_count carries rate_limits', () => {
+    const handle = createEventHandler()
+    handle(entry('event_msg', {
+      type: 'token_count',
+      info: null,
+      rate_limits: {
+        primary: { used_percent: 12.5, window_minutes: 300, resets_at: 1_800_000_000 },
+        secondary: { used_percent: 40, window_minutes: 10_080, resets_at: 1_800_500_000 }
+      }
+    }), '/sessions/rollout-a.jsonl')
+
+    expect(mockedWriteUsage).toHaveBeenCalledTimes(1)
+    expect(mockedWriteUsage).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'codex',
+      usedPercentage: 12.5,
+      resetsAt: 1_800_000_000
+    }))
+  })
+
+  it('does not write usage.json when token_count has no rate_limits', () => {
+    const handle = createEventHandler()
+    handle(entry('event_msg', {
+      type: 'token_count',
+      info: { total_token_usage: { input_tokens: 100, output_tokens: 50, total_tokens: 150 } }
+    }), '/sessions/rollout-a.jsonl')
+
+    expect(mockedWriteUsage).not.toHaveBeenCalled()
   })
 
   it('cleans up usage map on task_complete', () => {

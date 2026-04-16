@@ -4,7 +4,7 @@ import { watch } from 'chokidar'
 import { readFile, mkdir, writeFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
-import type { Status, MultiSessionStatus, UsageInfo } from '../shared/types'
+import type { Status, MultiSessionStatus, UsageInfo, SessionSource } from '../shared/types'
 import { startDevCodexWatcher, stopDevCodexWatcher } from './codex-watcher'
 import { createStatusUpdateCoalescer } from './status-update-coalescer'
 import { buildMultiSessionStatus, legacyToMultiSession, normalizeLegacyStatus, type SessionsFileFormat } from './status-state'
@@ -83,7 +83,10 @@ async function readUsage(): Promise<UsageInfo | null> {
     if (nowSeconds - parsed.updatedAt > USAGE_STALE_AFTER_SECONDS) {
       return null
     }
+    // Older files on disk (pre-Codex-usage) have no source; default to Claude.
+    const source: SessionSource = parsed.source === 'codex' ? 'codex' : 'claude-code'
     return {
+      source,
       usedPercentage: parsed.usedPercentage,
       resetsAt: parsed.resetsAt,
       updatedAt: parsed.updatedAt

@@ -11,10 +11,10 @@
 
 import { existsSync } from 'fs'
 import { watch } from 'chokidar'
-import { writeStatus, writeSessionStatus, removeSession, sessionIdFromPath } from '../lib/status-writer'
+import { writeStatus, writeSessionStatus, writeUsage, removeSession, sessionIdFromPath } from '../lib/status-writer'
 import { findLatestSession, CODEX_HOME, SESSIONS_DIR } from './session-finder'
 import { watchSession, watchForFirstSession, WINDOWS_POLL_INTERVAL_MS } from './session-watcher'
-import { mapCodexEvent, extractUsageFromEntry } from './event-mapper'
+import { mapCodexEvent, extractUsageFromEntry, extractRateLimitsFromEntry } from './event-mapper'
 import type { CodexRolloutEntry } from './types'
 import type { TokenUsage } from '../shared/types'
 import type { SessionWatcher } from './session-watcher'
@@ -43,6 +43,14 @@ export function createEventHandler(): (entry: CodexRolloutEntry, sessionFile: st
     // Track usage from token_count events
     const usage = extractUsageFromEntry(entry)
     if (usage) usageBySession.set(sessionId, usage)
+
+    // Mirror Codex's rate limits to usage.json so the badge can render.
+    const rateSnapshot = extractRateLimitsFromEntry(entry)
+    if (rateSnapshot) {
+      writeUsage(rateSnapshot).catch((err) => {
+        console.error(`[watcher] writeUsage failed:`, err)
+      })
+    }
 
     // Map to pet state
     const update = mapCodexEvent(entry)
