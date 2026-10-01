@@ -25,6 +25,7 @@ let mainWindow: BrowserWindow | null = null
 const STICKER_PACKS = [
   { id: 'bot1', name: 'Bot1' },
   { id: 'cloud', name: 'Cloud' },
+  { id: 'gandalf', name: 'Gandalf' },
   { id: 'paperclip', name: 'Paperclip' },
   { id: 'svg', name: 'SVG' }
 ]
